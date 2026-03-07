@@ -1307,3 +1307,32 @@ project/
 - `1.5` 已从“有训练样本”推进到“已有首版真实训练结果”
 - 这说明时序预测这条线已具备继续调参与评估的价值
 - 下一步将更适合补误差解释、等级预测评估与结果接页，而不是回到数据入口重做
+
+42. 1.5 首版 LSTM 评估与可视化已完成（2026-03-07）
+在首版 `LSTM` 训练完成后，当前已经进一步补上正式评估脚本与可视化输出。
+
+新增：
+- 评估脚本：`scripts/evaluate_fpi_lstm.py`
+- 评估测试：`tests/test_fpi_evaluation.py`
+
+当前评估输出已生成到：
+- `outputs/models/fpi_lstm_20260115_20260130/evaluation/`
+
+包含：
+- `evaluation.json`
+- `validation_predictions.csv`
+- `loss_curve.png`
+- `prediction_scatter.png`
+- `label_confusion.png`
+
+当前验证集结果：
+- `validation_rows = 234`
+- `mae = 0.1629`
+- `rmse = 0.2111`
+- `r2 = 0.5254`
+- `risk_label_accuracy = 0.7821`
+
+当前判断：
+- 模型已经学到了一定程度的下一窗口风险变化规律
+- 在三档风险标签上已具备初步筛查能力
+- 下一步更适合继续优化中间等级识别，并考虑将预测结果接入单船页或总览页

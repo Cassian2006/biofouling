@@ -95,6 +95,34 @@
 - 这已经足够证明时序预测链路可以真实跑通
 - 但它仍是 1.5 的起步版，还需要后续继续做误差解释、分类口径评估与预测结果接页
 
+## 首版评估结果
+
+当前已完成首版评估脚本：
+
+- `scripts/evaluate_fpi_lstm.py`
+
+评估输出：
+
+- `evaluation.json`
+- `validation_predictions.csv`
+- `loss_curve.png`
+- `prediction_scatter.png`
+- `label_confusion.png`
+
+当前验证集结果：
+
+- `validation_rows = 234`
+- `mae = 0.1629`
+- `rmse = 0.2111`
+- `r2 = 0.5254`
+- `risk_label_accuracy = 0.7821`
+
+当前解读：
+
+- 回归误差已经说明模型学到了部分下一窗口风险变化规律
+- 分类准确率说明它在 `low / medium / high` 三档标签上已有初步筛查能力
+- 但当前对 `medium` 样本的区分还不够强，后续应重点优化中间等级的识别
+
 ## 当前意义
 
 这一步的作用是把 `1.5` 从“方向讨论”推进到“已有真实训练入口”的状态。

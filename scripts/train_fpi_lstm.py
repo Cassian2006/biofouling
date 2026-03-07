@@ -8,9 +8,9 @@ import numpy as np
 import pandas as pd
 
 try:
-    from scripts.fpi_forecast import sequence_feature_columns
+    from scripts.fpi_forecast import assign_risk_label, sequence_feature_columns
 except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
-    from fpi_forecast import sequence_feature_columns  # type: ignore
+    from fpi_forecast import assign_risk_label, sequence_feature_columns  # type: ignore
 
 
 def require_torch():
@@ -41,7 +41,28 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_dataset(path: Path) -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
+class LSTMForecaster:
+    @staticmethod
+    def build(nn, input_size: int, hidden_size: int, layers: int):
+        class _Model(nn.Module):
+            def __init__(self, input_size: int, hidden_size: int, layers: int) -> None:
+                super().__init__()
+                self.lstm = nn.LSTM(
+                    input_size=input_size,
+                    hidden_size=hidden_size,
+                    num_layers=layers,
+                    batch_first=True,
+                )
+                self.head = nn.Linear(hidden_size, 1)
+
+            def forward(self, inputs):
+                output, _ = self.lstm(inputs)
+                return self.head(output[:, -1, :]).squeeze(-1)
+
+        return _Model(input_size=input_size, hidden_size=hidden_size, layers=layers)
+
+
+def load_dataset(path: Path) -> tuple[pd.DataFrame, np.ndarray, np.ndarray, list[str]]:
     dataframe = pd.read_csv(path)
     feature_columns = sequence_feature_columns(dataframe)
     if not feature_columns:
@@ -52,7 +73,7 @@ def load_dataset(path: Path) -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
     features = dataframe[feature_columns].fillna(0.0).to_numpy(dtype=np.float32)
     targets = dataframe["target_fpi_proxy"].to_numpy(dtype=np.float32)
     reshaped = features.reshape(len(dataframe), history_steps, base_features)
-    return dataframe, reshaped, targets
+    return dataframe, reshaped, targets, feature_columns
 
 
 def split_by_vessel(
@@ -71,29 +92,18 @@ def split_by_vessel(
     return features[train_mask], targets[train_mask], features[val_mask], targets[val_mask]
 
 
+def risk_labels_from_targets(targets: np.ndarray) -> list[str]:
+    return [assign_risk_label(float(value)) for value in targets.tolist()]
+
+
 def main() -> None:
     args = parse_args()
     torch, nn, DataLoader, TensorDataset = require_torch()
 
-    dataframe, features, targets = load_dataset(Path(args.dataset))
+    dataframe, features, targets, feature_columns = load_dataset(Path(args.dataset))
     train_x, train_y, val_x, val_y = split_by_vessel(dataframe, features, targets)
-
-    class LSTMForecaster(nn.Module):
-        def __init__(self, input_size: int, hidden_size: int, layers: int) -> None:
-            super().__init__()
-            self.lstm = nn.LSTM(
-                input_size=input_size,
-                hidden_size=hidden_size,
-                num_layers=layers,
-                batch_first=True,
-            )
-            self.head = nn.Linear(hidden_size, 1)
-
-        def forward(self, inputs):
-            output, _ = self.lstm(inputs)
-            return self.head(output[:, -1, :]).squeeze(-1)
-
-    model = LSTMForecaster(
+    model = LSTMForecaster.build(
+        nn,
         input_size=train_x.shape[2],
         hidden_size=args.hidden_size,
         layers=args.layers,
@@ -141,6 +151,13 @@ def main() -> None:
         "rows": int(len(dataframe)),
         "train_rows": int(len(train_x)),
         "val_rows": int(len(val_x)),
+        "dataset_path": str(Path(args.dataset).resolve()),
+        "history_steps": int(train_x.shape[1]),
+        "input_size": int(train_x.shape[2]),
+        "feature_columns": feature_columns,
+        "hidden_size": int(args.hidden_size),
+        "layers": int(args.layers),
+        "label_set": sorted(set(risk_labels_from_targets(targets))),
         "history": history,
     }
     (output_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
