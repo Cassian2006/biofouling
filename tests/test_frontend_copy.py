@@ -21,12 +21,13 @@ def test_core_pages_use_collapsible_explanations() -> None:
     regional = read_text("frontend/src/pages/RegionalRiskPage.vue")
 
     assert "InfoDisclosure" in dashboard
-    assert "页面说明" in dashboard
+    assert "区域主地图" in dashboard
+    assert "/demo/regional_demo_map.html" in dashboard
 
     assert "InfoDisclosure" in vessel
-    assert "轨迹判读说明" in vessel
-    assert "趋势判读说明" in vessel
+    assert "轨迹图说明" in vessel
+    assert "趋势图说明" in vessel
 
     assert "InfoDisclosure" in regional
-    assert "图层判读说明" in regional
+    assert "图层说明" in regional
     assert "地图说明" in regional

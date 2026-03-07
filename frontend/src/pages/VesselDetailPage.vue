@@ -41,17 +41,17 @@ const vesselFacts = computed(() => {
     {
       title: "轨迹点数与时长",
       value: `${selectedVessel.value.ping_count} 点 / ${selectedVessel.value.track_duration_hours} 小时`,
-      description: "点数与时长越充分，说明当前判断建立在更完整的行为观测之上。",
+      description: "点数与时长越充分，说明当前判断建立在更完整的行为观测基础上。",
     },
     {
       title: "低速暴露比例",
       value: `${selectedVessel.value.low_speed_ratio ?? "暂无"}`,
-      description: "低速暴露是首版规则里最重要的行为信号之一。",
+      description: "低速暴露是首版规则中最重要的行为信号之一。",
     },
     {
       title: "平均位置",
       value: `${selectedVessel.value.mean_latitude}, ${selectedVessel.value.mean_longitude}`,
-      description: "用于说明该船在本时间窗内主要活动于哪片海域。",
+      description: "用于说明该船在本时间窗内的主要活动海域。",
     },
     {
       title: "平均海温暴露",
@@ -85,12 +85,12 @@ const staticFacts = computed(() => {
     {
       title: "画像来源",
       value: staticProfile.value.profile_source,
-      description: "用于说明当前画像是 AIS 派生结果，还是已融合外部静态资料。",
+      description: "说明当前画像来自 AIS 派生结果，或已融合外部静态资料。",
     },
     {
       title: "船名 / IMO",
       value: `${staticProfile.value.vessel_name || "暂无"} / ${staticProfile.value.imo || "暂无"}`,
-      description: "后续接入完整外部静态资料后，这里会显示更完整的识别信息。",
+      description: "后续接入完整外部静态资料后，此处将显示更完整的识别信息。",
     },
     {
       title: "船型 / 船旗",
@@ -111,7 +111,7 @@ const staticFacts = computed(() => {
         staticProfile.value.design_draught_m !== null || staticProfile.value.observed_draught_m !== null
           ? `${staticProfile.value.design_draught_m ?? "暂无"} / ${staticProfile.value.observed_draught_m ?? "暂无"}`
           : "暂无",
-      description: "当前至少可从 AIS 中提取观测吃水，后续可补设计吃水。",
+      description: "当前至少可从 AIS 中提取观测吃水，后续可继续补设计吃水。",
     },
     {
       title: "主要目的地 / 航行状态",
@@ -120,9 +120,7 @@ const staticFacts = computed(() => {
     },
     {
       title: "最近港口 / 锚地",
-      value: nearestReference.value
-        ? `${nearestReference.value.name}（${nearestReference.value.site_type}）`
-        : "暂无",
+      value: nearestReference.value ? `${nearestReference.value.name}（${nearestReference.value.site_type}）` : "暂无",
       description: nearestReference.value
         ? `按船舶平均位置匹配，距离约 ${vesselDetail.value?.nearest_reference_distance_km ?? "暂无"} km。`
         : "当前没有可用的港口或锚地参考点匹配。",
@@ -141,12 +139,12 @@ const validationFacts = computed(() => {
     {
       title: "最近校验事件",
       value: validationSummary.value.latest_event_type || "暂无",
-      description: "后续接入离港、进港或维护事件后，可在这里查看最近记录。",
+      description: "后续接入离港、进港或维护事件后，可在此查看最近记录。",
     },
     {
       title: "最近事件位置",
       value: validationSummary.value.latest_port_name || "暂无",
-      description: "用于把分析判断与真实港口或案例位置对齐。",
+      description: "用于将分析判断与真实港口或案例位置对齐。",
     },
     {
       title: "外部来源数",
@@ -363,9 +361,9 @@ watch(
     <section class="hero-grid">
       <article class="page-card hero-copy-card">
         <p class="section-kicker">Vessel Detail</p>
-        <h2>围绕单船轨迹、时间趋势、画像信息与建议结果，建立一页式判读视图。</h2>
+        <h2>单船暴露诊断与轨迹判读</h2>
         <p class="support-text">
-          本页用于回答三个问题：这艘船在当前时间窗里如何活动、为什么被判为当前优先级、以及已有哪些辅助资料可供解释或校验。
+          页面集中展示单船轨迹、时间趋势、环境暴露、船舶画像与校验摘要，用于支持对象级风险判读。
         </p>
       </article>
 
@@ -391,16 +389,13 @@ watch(
 
     <InfoDisclosure
       title="页面说明"
-      summary="本页说明已折叠。页面重点展示单船证据链，而不是堆叠解释文字。"
+      summary="单船页用于呈现对象级证据链，说明内容已折叠收纳。"
     >
       <p>
-        单船页将行为证据、环境暴露、船舶画像与外部校验入口放在同一页，目的是减少在多个页面之间来回跳转。
+        本页将行为证据、环境暴露、船舶画像与外部校验入口放在同一页面，减少在多个页面之间切换的成本。
       </p>
       <p>
-        轨迹图与趋势图负责说明“这艘船做了什么”，船舶画像与校验摘要负责补充“它是什么样的船、已有何种外部信息”。
-      </p>
-      <p>
-        1.0 阶段优先保障信息完整与判读清晰，后续再继续增强地图交互和报告导出能力。
+        轨迹图与趋势图用于说明船舶活动特征，画像与校验摘要用于补充对象背景和外部信息基础。
       </p>
     </InfoDisclosure>
 
@@ -437,12 +432,11 @@ watch(
         </article>
 
         <InfoDisclosure
-          title="轨迹判读说明"
-          summary="深色折线表示整体走向，绿色点为起点，橙色点为终点，浅色点为抽样后的低速位置。"
+          title="轨迹图说明"
+          summary="深色折线表示整体走向，绿色点为起点，橙色点为终点，浅色点为低速位置抽样。"
         >
-          <p>先看整体形状，判断是否存在明显停留、折返或局部聚集。</p>
-          <p>再看低速点位置，当前规则将低速暴露视为重要信号，因此会重点标示低速区域。</p>
-          <p>1.0 先保证真实轨迹接入与清晰表达，后续再继续升级为带底图和时间筛选的地图轨迹。</p>
+          <p>轨迹图用于展示对象在当前时间窗内的空间活动形态与低速活动分布。</p>
+          <p>后续版本将继续增强底图叠加、时间筛选与港口参考层联动能力。</p>
         </InfoDisclosure>
       </div>
     </section>
@@ -500,12 +494,11 @@ watch(
         </article>
 
         <InfoDisclosure
-          title="趋势判读说明"
+          title="趋势图说明"
           summary="柱体表示记录点数量，蓝线表示平均航速，橙线表示低速比例。"
         >
-          <p>先看柱体高度，判断各时段记录是否充分。</p>
-          <p>再看蓝线与橙线位置，识别哪些时段更慢、更可能出现停留或持续低速活动。</p>
-          <p>这组趋势用于补充“某条船为何被判入当前优先级”，而不仅是展示一条静态轨迹。</p>
+          <p>趋势图用于识别轨迹记录密度、速度变化和低速暴露在不同时间段的变化情况。</p>
+          <p>该图是单船建议解释的重要证据之一，用于支撑对象级风险判断。</p>
         </InfoDisclosure>
       </div>
     </section>
@@ -604,7 +597,7 @@ watch(
     <section class="content-section">
       <div class="section-head">
         <p class="section-kicker">Switch</p>
-        <h3>切换到其他重点船舶</h3>
+        <h3>重点对象切换</h3>
       </div>
       <article class="page-card list-card">
         <RouterLink

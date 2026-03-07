@@ -18,7 +18,7 @@ const layerOptions = [
     key: "rri_score",
     title: "综合风险层",
     shortLabel: "RRI",
-    description: "综合交通、低速与环境三类信号后的总体风险，用于识别优先关注区域。",
+    description: "综合交通、低速与环境三类信号后的总体风险，用于识别重点区域。",
   },
   {
     key: "traffic_score",
@@ -73,12 +73,12 @@ const layerSummaryCards = computed(() => {
     {
       title: "图层平均值",
       value: averageValue ?? "暂无",
-      description: "表示整个研究区在该图层上的总体压力水平。",
+      description: "表示研究区在该图层上的总体压力水平。",
     },
     {
       title: "高值格网数量",
       value: activeCells,
-      description: "当前以 0.5 作为展示阈值，用于快速识别明显偏高区域。",
+      description: "当前以 0.5 作为展示阈值，用于识别明显偏高区域。",
     },
     {
       title: "当前热点格网",
@@ -100,12 +100,12 @@ const hotspotFactors = computed(() => {
     {
       title: "低速暴露分值",
       value: cell.low_speed_score,
-      description: "表示该格网内低速与停留行为的积累程度。",
+      description: "表示该格网内低速与停留行为的累积程度。",
     },
     {
       title: "环境暴露分值",
       value: cell.environment_score,
-      description: "表示该格网环境条件对污损压力的促进程度。",
+      description: "表示环境条件对污损压力的促进程度。",
     },
     {
       title: "最近参考点",
@@ -128,11 +128,11 @@ const hotspotExplanation = computed(() => {
   ].sort((left, right) => right.value - left.value);
 
   return [
-    `当前正在查看“${layerMeta.value.title}”，热点榜单会优先按照该图层排序。`,
+    `当前图层为“${layerMeta.value.title}”，热点榜单按照该图层的分值排序。`,
     `该热点格网的综合风险值为 ${cell.rri_score}，共有 ${cell.vessel_count} 艘船经过，累计 ${cell.traffic_points} 个轨迹点。`,
     `从分值构成看，当前最主要的驱动因素是 ${factors[0].title}，其次是 ${factors[1].title}。`,
     cell.nearest_reference_name
-      ? `从地理语义上看，它更接近 ${cell.nearest_reference_name}，距离约 ${cell.nearest_reference_distance_km} km，可作为近港或锚地解释的参考。`
+      ? `从空间语义看，该热点更接近 ${cell.nearest_reference_name}，距离约 ${cell.nearest_reference_distance_km} km。`
       : "当前没有近港或锚地参考匹配，因此本轮解释以格网行为与环境信号为主。",
   ];
 });
@@ -245,9 +245,9 @@ watch([activeLayer, selectedHotspotKey], () => {
     <section class="hero-grid">
       <article class="page-card hero-copy-card">
         <p class="section-kicker">Regional Risk</p>
-        <h2>用统一的区域视角查看热点位置、主要驱动因素与近港语义解释。</h2>
+        <h2>区域风险空间分布与热点解释</h2>
         <p class="support-text">
-          本页用于回答三个问题：哪里最值得关注、热点由什么驱动、它更接近港口还是锚地。
+          页面用于展示研究区格网分布、热点成因及其与港口、锚地参考点之间的空间关系。
         </p>
       </article>
 
@@ -273,16 +273,13 @@ watch([activeLayer, selectedHotspotKey], () => {
 
     <InfoDisclosure
       title="页面说明"
-      summary="区域页优先强调热点解释与图层对比，说明文字已统一折叠收纳。"
+      summary="区域页以图层比较与热点解释为主，说明内容已折叠收纳。"
     >
       <p>
-        本页不只是展示“哪里高风险”，更强调“为什么高风险”以及“换一个图层视角后会发生什么变化”。
+        本页不仅用于展示高风险区域，更用于解释热点形成的主要驱动因素，并补充港口与锚地参考语义。
       </p>
       <p>
-        图层切换用于区分综合风险、交通暴露、低速暴露与环境暴露。热点解释与榜单会随当前图层实时改变。
-      </p>
-      <p>
-        港口与锚地参考层用于补充地理语义，让热点不再只是经纬度坐标，而是与近港环境建立联系。
+        图层切换用于区分综合风险、交通暴露、低速暴露与环境暴露，榜单和解释会随当前图层变化。
       </p>
     </InfoDisclosure>
 
@@ -337,12 +334,12 @@ watch([activeLayer, selectedHotspotKey], () => {
         </article>
 
         <InfoDisclosure
-          title="图层判读说明"
-          summary="矩阵图不替代地图，它的作用是让不同图层下的高值区域变化更稳定、直观。"
+          title="图层说明"
+          summary="矩阵图用于稳定比较各图层下的高值区域，不替代地图视图。"
         >
-          <p>当前图层：{{ layerMeta.description }}</p>
-          <p>矩阵图将地图中的格网结构抽离出来，更适合横向比较不同图层下的高值格网变化。</p>
-          <p>加入参考层后，热点解释不仅停留在坐标层面，也能说明其更接近哪个港口或锚地。</p>
+          <p>{{ layerMeta.description }}</p>
+          <p>矩阵图将地图中的格网结构抽离出来，适合比较不同图层下的高值区域变化。</p>
+          <p>地图则负责回到真实海域语境，两者在表达上分工不同。</p>
         </InfoDisclosure>
       </div>
     </section>
@@ -447,14 +444,14 @@ watch([activeLayer, selectedHotspotKey], () => {
     <section class="content-section">
       <div class="section-head">
         <p class="section-kicker">Map</p>
-        <h3>区域地图参考</h3>
+        <h3>区域地图</h3>
       </div>
       <InfoDisclosure
         title="地图说明"
-        summary="地图用于回到真实海域语境，矩阵图用于稳定比较图层，两者分工不同。"
+        summary="地图用于回到真实海域语境，矩阵图用于稳定比较图层结果。"
       >
         <p>
-          地图保留为地理位置参考视图，用于帮助将格网热点与真实海域位置对应起来。矩阵图负责比较图层，地图负责回到空间语境。
+          地图保留为空间位置参考视图，用于将格网热点与真实海域位置对应起来。矩阵图与地图互为补充，而不是相互替代。
         </p>
       </InfoDisclosure>
       <article class="page-card map-card">

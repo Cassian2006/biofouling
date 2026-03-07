@@ -403,6 +403,10 @@ img {
   background: white;
 }
 
+.map-card-compact iframe {
+  height: 620px;
+}
+
 .detail-layout {
   align-items: start;
 }
