@@ -20,6 +20,9 @@ def test_tooltip_and_map_components_exist() -> None:
     assert "leaflet" in vessel_map.lower()
     assert "FPI = 0.5" in method_drawer
     assert "RRI = 0.40" in method_drawer
+    assert "LSTM 数据构建" in method_drawer
+    assert "训练样本使用最近 8 个连续窗口作为输入" in method_drawer
+    assert "当前前端使用的校准阈值为 0.53 / 0.69" in method_drawer
 
 
 def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
@@ -35,6 +38,7 @@ def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
     assert "VesselTrackMap" in vessel
     assert "selector-input" in vessel
     assert "单船关键字段" in vessel
+    assert "预测区间" in vessel
 
     assert 'redirect: "/"' in router
     assert 'to="/regional-risk"' not in app_shell

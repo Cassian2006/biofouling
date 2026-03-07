@@ -502,7 +502,7 @@ watch(
                 <strong>{{ vesselForecast.forecast_window_start }} → {{ vesselForecast.forecast_window_end }}</strong>
               </div>
               <div class="summary-metric">
-                <span>置信带</span>
+                <span>预测区间</span>
                 <strong>{{ vesselForecast.confidence_band_low }} ~ {{ vesselForecast.confidence_band_high }}</strong>
               </div>
               <div class="summary-metric">
