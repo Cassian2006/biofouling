@@ -7,6 +7,7 @@ import pandas as pd
 
 AIS_REQUIRED_COLUMNS = ["mmsi", "timestamp", "latitude", "longitude", "is_low_speed"]
 ENV_REQUIRED_COLUMNS = ["timestamp", "latitude", "longitude", "sst"]
+OPTIONAL_ENV_COLUMNS = ["chlorophyll_a", "salinity", "current_u", "current_v"]
 
 
 def parse_args() -> argparse.Namespace:
@@ -54,7 +55,7 @@ def prepare_env(dataframe: pd.DataFrame) -> pd.DataFrame:
     env["latitude"] = pd.to_numeric(env["latitude"], errors="coerce")
     env["longitude"] = pd.to_numeric(env["longitude"], errors="coerce")
     env["sst"] = pd.to_numeric(env["sst"], errors="coerce")
-    for column in ["salinity", "current_u", "current_v", "chlorophyll_a"]:
+    for column in OPTIONAL_ENV_COLUMNS:
         if column in env.columns:
             env[column] = pd.to_numeric(env[column], errors="coerce")
     env = env.dropna(subset=["timestamp", "latitude", "longitude", "sst"])
@@ -74,29 +75,38 @@ def attach_environment(ais: pd.DataFrame, env: pd.DataFrame) -> pd.DataFrame:
         day = ais_day.copy()
         if env_day is None or env_day.empty:
             day["sst"] = np.nan
-            day["chlorophyll_a"] = np.nan
+            for column in OPTIONAL_ENV_COLUMNS:
+                day[column] = np.nan
             matched_frames.append(day)
             continue
 
         env_lat = env_day["latitude"].to_numpy()
         env_lon = env_day["longitude"].to_numpy()
         env_sst = env_day["sst"].to_numpy()
-        env_chl = (
-            env_day["chlorophyll_a"].to_numpy()
-            if "chlorophyll_a" in env_day.columns
-            else np.full(len(env_day), np.nan)
-        )
+        env_optional = {
+            column: (
+                env_day[column].to_numpy()
+                if column in env_day.columns
+                else np.full(len(env_day), np.nan)
+            )
+            for column in OPTIONAL_ENV_COLUMNS
+        }
 
         matched_sst: list[float] = []
-        matched_chl: list[float] = []
+        matched_optional = {column: [] for column in OPTIONAL_ENV_COLUMNS}
         for row in day.itertuples(index=False):
             distance = (env_lat - row.latitude) ** 2 + (env_lon - row.longitude) ** 2
             nearest_index = int(distance.argmin())
             matched_sst.append(float(env_sst[nearest_index]))
-            matched_chl.append(float(env_chl[nearest_index]) if len(env_chl) else np.nan)
+            for column in OPTIONAL_ENV_COLUMNS:
+                values = env_optional[column]
+                matched_optional[column].append(
+                    float(values[nearest_index]) if len(values) else np.nan
+                )
 
         day["sst"] = matched_sst
-        day["chlorophyll_a"] = matched_chl
+        for column in OPTIONAL_ENV_COLUMNS:
+            day[column] = matched_optional[column]
         matched_frames.append(day)
 
     return pd.concat(matched_frames, ignore_index=True)
@@ -115,6 +125,9 @@ def build_vessel_features(ais: pd.DataFrame, env: pd.DataFrame | None) -> pd.Dat
             low_speed_ratio=("is_low_speed", "mean"),
             mean_sst=("sst", "mean"),
             mean_chlorophyll_a=("chlorophyll_a", "mean"),
+            mean_salinity=("salinity", "mean"),
+            mean_current_u=("current_u", "mean"),
+            mean_current_v=("current_v", "mean"),
         )
         .copy()
     )
@@ -135,6 +148,9 @@ def build_vessel_features(ais: pd.DataFrame, env: pd.DataFrame | None) -> pd.Dat
     else:
         features["mean_sst"] = None
         features["mean_chlorophyll_a"] = None
+        features["mean_salinity"] = None
+        features["mean_current_u"] = None
+        features["mean_current_v"] = None
         features["ecp_proxy"] = features["fpi_proxy"]
 
     features["recommendation"] = features["fpi_proxy"].apply(recommend_action)

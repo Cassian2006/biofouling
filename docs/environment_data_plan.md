@@ -110,3 +110,31 @@
 1. `scripts/process_env.py`
 2. `scripts/build_features.py`
 3. `scripts/generate_report.py`
+
+## 2026-03-07 补充更新：新增已验证环境数据集
+
+### 盐度
+- 数据集 ID：`cmems_mod_glo_phy-so_anfc_0.083deg_P1D-m`
+- 变量：`so`
+- 当前状态：已完成真实下载
+
+### 海流
+- 数据集 ID：`cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m`
+- 变量：`uo`、`vo`
+- 当前状态：已完成真实下载
+
+## 当前处理链更新
+
+当前环境处理脚本已支持：
+- `thetao -> sst`
+- `chl -> chlorophyll_a`
+- `so -> salinity`
+- `uo -> current_u`
+- `vo -> current_v`
+
+当前完整环境表已能携带：
+- `sst`
+- `chlorophyll_a`
+- `salinity`
+- `current_u`
+- `current_v`

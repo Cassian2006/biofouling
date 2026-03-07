@@ -937,3 +937,37 @@ project/
   - 扩展 1.0 需要的数据类别
   - 把关键操作链路做成产品页面
   - 继续提升中文表达、交互反馈与可视化质量
+
+28. 1.0 数据补齐第一步进展（2026-03-07）
+当前已开始执行 1.0 的第一优先级：补齐数据类别，而不是停留在清单层。
+
+本轮已完成：
+- 新增并验证 `salinity` 数据下载任务
+- 新增并验证 `current_u / current_v` 数据下载任务
+- 真实下载文件已落地：
+  - `data/external/copernicus/so_20260115_20260118.nc`
+  - `data/external/copernicus/currents_20260115_20260118.nc`
+- 环境处理脚本已支持把以下变量统一进入环境表：
+  - `thetao -> sst`
+  - `chl -> chlorophyll_a`
+  - `so -> salinity`
+  - `uo -> current_u`
+  - `vo -> current_v`
+- 已重新生成环境表与船舶特征表，当前 52 艘船均已获得：
+  - `mean_chlorophyll_a`
+  - `mean_salinity`
+  - `mean_current_u`
+  - `mean_current_v`
+
+当前状态更新：
+- 1.0 所需的核心环境变量现在已经不再只有温度和叶绿素，而是扩展为五项：
+  - `sst`
+  - `chlorophyll_a`
+  - `salinity`
+  - `current_u`
+  - `current_v`
+- 当前仍未补齐的主要数据类别是：
+  - 港口 / 锚地参考数据
+  - 更完整船舶静态资料与外部校验数据
+
+这意味着 1.0 的数据缺口已经从“环境变量明显不全”缩小为“辅助参考层和校验层未补齐”。

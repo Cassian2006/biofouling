@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import xarray as xr
 
@@ -30,6 +31,14 @@ def parse_args() -> argparse.Namespace:
         help="Path to Copernicus chlorophyll NetCDF file.",
     )
     parser.add_argument(
+        "--salinity-netcdf",
+        help="Path to Copernicus salinity NetCDF file.",
+    )
+    parser.add_argument(
+        "--currents-netcdf",
+        help="Path to Copernicus currents NetCDF file with uo/vo variables.",
+    )
+    parser.add_argument(
         "--output",
         default="data/processed/env_processed.csv",
         help="Path to processed environment CSV output.",
@@ -43,36 +52,93 @@ def load_env_csv(path: Path) -> pd.DataFrame:
     return dataframe
 
 
-def load_env_netcdf(thetao_path: Path | None, chl_path: Path | None) -> pd.DataFrame:
-    frames: list[pd.DataFrame] = []
+def dataset_to_frame(path: Path, variable_mapping: dict[str, str]) -> pd.DataFrame:
+    dataset = xr.open_dataset(path)
+    dataframe = dataset[list(variable_mapping)].to_dataframe().reset_index()
+    dataframe = dataframe.rename(columns=variable_mapping)
+    dataframe = dataframe.rename(columns={"time": "timestamp"})
+    if "depth" in dataframe.columns:
+        dataframe = dataframe.drop(columns=["depth"])
+    dataframe["timestamp"] = pd.to_datetime(dataframe["timestamp"], utc=True, errors="coerce")
+    return dataframe
 
-    if thetao_path:
-        ds = xr.open_dataset(thetao_path)
-        df = ds[["thetao"]].to_dataframe().reset_index()
-        df = df.rename(columns={"thetao": "sst"})
-        frames.append(df)
 
-    if chl_path:
-        ds = xr.open_dataset(chl_path)
-        df = ds[["chl"]].to_dataframe().reset_index()
-        df = df.rename(columns={"chl": "chlorophyll_a"})
-        frames.append(df)
+def attach_variables_by_nearest_grid(
+    base: pd.DataFrame,
+    auxiliary: pd.DataFrame,
+    value_columns: list[str],
+) -> pd.DataFrame:
+    result = base.copy()
+    auxiliary_indexed = {
+        timestamp: frame.reset_index(drop=True)
+        for timestamp, frame in auxiliary.groupby("timestamp", sort=False)
+    }
 
-    if not frames:
+    for column in value_columns:
+        result[column] = np.nan
+
+    matched_frames: list[pd.DataFrame] = []
+    for timestamp, base_frame in result.groupby("timestamp", sort=False):
+        aux_frame = auxiliary_indexed.get(timestamp)
+        day = base_frame.copy()
+
+        if aux_frame is None or aux_frame.empty:
+            matched_frames.append(day)
+            continue
+
+        aux_frame = aux_frame.dropna(subset=value_columns, how="all").reset_index(drop=True)
+        if aux_frame.empty:
+            matched_frames.append(day)
+            continue
+
+        aux_lat = aux_frame["latitude"].to_numpy()
+        aux_lon = aux_frame["longitude"].to_numpy()
+        aux_values = {
+            column: aux_frame[column].to_numpy()
+            for column in value_columns
+        }
+
+        matched = {column: [] for column in value_columns}
+        for row in day.itertuples(index=False):
+            distance = (aux_lat - row.latitude) ** 2 + (aux_lon - row.longitude) ** 2
+            nearest_index = int(distance.argmin())
+            for column in value_columns:
+                matched[column].append(float(aux_values[column][nearest_index]))
+
+        for column in value_columns:
+            day[column] = matched[column]
+
+        matched_frames.append(day)
+
+    return pd.concat(matched_frames, ignore_index=True)
+
+
+def load_env_netcdf(
+    thetao_path: Path | None,
+    chl_path: Path | None,
+    salinity_path: Path | None = None,
+    currents_path: Path | None = None,
+) -> pd.DataFrame:
+    if not thetao_path:
+        raise ValueError("Thetao NetCDF is required as the base grid for environment processing.")
+
+    base = dataset_to_frame(thetao_path, {"thetao": "sst"})
+    if base.empty:
         raise ValueError("At least one NetCDF path must be provided.")
 
-    merged = frames[0]
-    for frame in frames[1:]:
-        merged = merged.merge(
-            frame,
-            on=[column for column in ["time", "depth", "latitude", "longitude"] if column in frame.columns],
-            how="outer",
-        )
+    if chl_path:
+        chl = dataset_to_frame(chl_path, {"chl": "chlorophyll_a"})
+        base = attach_variables_by_nearest_grid(base, chl, ["chlorophyll_a"])
 
-    merged = merged.rename(columns={"time": "timestamp"})
-    if "depth" in merged.columns:
-        merged = merged.drop(columns=["depth"])
-    return merged
+    if salinity_path:
+        salinity = dataset_to_frame(salinity_path, {"so": "salinity"})
+        base = attach_variables_by_nearest_grid(base, salinity, ["salinity"])
+
+    if currents_path:
+        currents = dataset_to_frame(currents_path, {"uo": "current_u", "vo": "current_v"})
+        base = attach_variables_by_nearest_grid(base, currents, ["current_u", "current_v"])
+
+    return base
 
 
 def validate_columns(dataframe: pd.DataFrame) -> None:
@@ -121,6 +187,8 @@ def main() -> None:
         dataframe = load_env_netcdf(
             Path(args.thetao_netcdf) if args.thetao_netcdf else None,
             Path(args.chl_netcdf) if args.chl_netcdf else None,
+            Path(args.salinity_netcdf) if args.salinity_netcdf else None,
+            Path(args.currents_netcdf) if args.currents_netcdf else None,
         )
 
     validate_columns(dataframe)

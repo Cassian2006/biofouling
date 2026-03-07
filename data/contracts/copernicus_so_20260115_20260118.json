@@ -1,0 +1,22 @@
+{
+  "dataset_id": "cmems_mod_glo_phy-so_anfc_0.083deg_P1D-m",
+  "variables": [
+    "so"
+  ],
+  "bbox": {
+    "west": 102.9,
+    "south": 0.8,
+    "east": 104.9,
+    "north": 1.85
+  },
+  "minimum_depth": 0,
+  "maximum_depth": 1,
+  "start_time": "2026-01-15T00:00:00Z",
+  "end_time": "2026-01-18T00:00:00Z",
+  "output_directory": "data/external/copernicus",
+  "output_filename": "so_20260115_20260118.nc",
+  "file_format": "netcdf",
+  "skip_existing": true,
+  "overwrite": false,
+  "disable_progress_bar": false
+}

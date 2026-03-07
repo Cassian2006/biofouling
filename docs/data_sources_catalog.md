@@ -190,3 +190,26 @@
 3. 再下载 `chlorophyll_a`
 4. 如果流程稳定，再补 `salinity`
 5. 最后再补海流和更多辅助数据
+
+## 2026-03-07 补充更新：1.0 环境数据补齐进展
+
+当前已新增并验证可用的数据集：
+
+### 盐度 `salinity`
+- 数据集 ID：`cmems_mod_glo_phy-so_anfc_0.083deg_P1D-m`
+- 变量：`so`
+- 当前状态：已下载到本地，可进入环境处理链
+
+### 海流 `current_u / current_v`
+- 数据集 ID：`cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m`
+- 变量：`uo`、`vo`
+- 当前状态：已下载到本地，可进入环境处理链
+
+当前 1.0 数据资源状态更新为：
+- AIS：已到位
+- `sst`：已到位
+- `chlorophyll_a`：已到位
+- `salinity`：已到位
+- `current_u / current_v`：已到位
+- 港口 / 锚地参考数据：仍待补齐
+- 更完整船舶静态资料与外部校验数据：仍待补齐
