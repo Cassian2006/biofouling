@@ -1,7 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import DashboardPage from "./pages/DashboardPage.vue";
 import VesselDetailPage from "./pages/VesselDetailPage.vue";
-import RegionalRiskPage from "./pages/RegionalRiskPage.vue";
 
 const routes = [
   {
@@ -16,8 +15,7 @@ const routes = [
   },
   {
     path: "/regional-risk",
-    name: "regional-risk",
-    component: RegionalRiskPage,
+    redirect: "/",
   },
 ];
 

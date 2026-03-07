@@ -1,12 +1,15 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
-import { RouterLink, useRoute } from "vue-router";
-import InfoDisclosure from "../components/InfoDisclosure.vue";
+import { RouterLink, useRoute, useRouter } from "vue-router";
+import HintTooltip from "../components/HintTooltip.vue";
+import VesselTrackMap from "../components/VesselTrackMap.vue";
 import { useDemoData } from "../composables/useDemoData";
 
 const route = useRoute();
+const router = useRouter();
 const {
   summary,
+  vessels,
   loading,
   error,
   fetchDemoData,
@@ -23,6 +26,7 @@ const reportPreview = ref(null);
 const pageError = ref("");
 const trackError = ref("");
 const trendError = ref("");
+const selectedMmsi = ref("");
 
 const selectedVessel = computed(() => vesselDetail.value?.vessel || null);
 const peerVessels = computed(() => vesselDetail.value?.peer_vessels || []);
@@ -30,51 +34,84 @@ const staticProfile = computed(() => vesselDetail.value?.static_profile || null)
 const validationSummary = computed(() => vesselDetail.value?.validation_summary || null);
 const nearestReference = computed(() => vesselDetail.value?.nearest_reference || null);
 
+const vesselOptions = computed(() =>
+  vessels.value.map((item) => ({
+    value: item.mmsi,
+    label: `#${item.rank}  ${item.mmsi}  |  FPI ${item.fpi_proxy ?? "暂无"}  |  ${item.recommendation}`,
+  })),
+);
+
+function buildAssessment(values, value) {
+  const numericValues = values.filter((item) => Number.isFinite(item)).sort((left, right) => left - right);
+  if (!Number.isFinite(value) || numericValues.length < 3) return null;
+  const lower = numericValues[Math.floor((numericValues.length - 1) * 0.33)];
+  const upper = numericValues[Math.floor((numericValues.length - 1) * 0.67)];
+  if (value <= lower) return "相对较低";
+  if (value >= upper) return "相对较高";
+  return "中等";
+}
+
 const vesselFacts = computed(() => {
   if (!selectedVessel.value) return [];
+  const sstValues = vessels.value.map((item) => item.mean_sst);
+  const chlorophyllValues = vessels.value.map((item) => item.mean_chlorophyll_a);
+  const salinityValues = vessels.value.map((item) => item.mean_salinity);
+  const lowSpeedValues = vessels.value.map((item) => item.low_speed_ratio);
+  const durationValues = vessels.value.map((item) => item.track_duration_hours);
+  const currentIntensityValues = vessels.value.map((item) => {
+    if (item.mean_current_u === null || item.mean_current_v === null) return null;
+    return Math.hypot(item.mean_current_u, item.mean_current_v);
+  });
+  const currentIntensity =
+    selectedVessel.value.mean_current_u !== null && selectedVessel.value.mean_current_v !== null
+      ? Math.hypot(selectedVessel.value.mean_current_u, selectedVessel.value.mean_current_v)
+      : null;
+
   return [
     {
       title: "轨迹时间窗",
       value: `${selectedVessel.value.track_start} -> ${selectedVessel.value.track_end}`,
-      description: "显示该船在当前研究时间窗内被实际捕获到的轨迹范围。",
+      description: "对应本轮研究窗口内的实际 AIS 记录时间范围。",
+      assessment: null,
     },
     {
       title: "轨迹点数与时长",
       value: `${selectedVessel.value.ping_count} 点 / ${selectedVessel.value.track_duration_hours} 小时`,
-      description: "点数与时长越充分，说明当前判断建立在更完整的行为观测基础上。",
+      description: "点数与时间跨度决定该对象的观测充分性。",
+      assessment: buildAssessment(durationValues, selectedVessel.value.track_duration_hours),
     },
     {
       title: "低速暴露比例",
-      value: `${selectedVessel.value.low_speed_ratio ?? "暂无"}`,
-      description: "低速暴露是首版规则中最重要的行为信号之一。",
-    },
-    {
-      title: "平均位置",
-      value: `${selectedVessel.value.mean_latitude}, ${selectedVessel.value.mean_longitude}`,
-      description: "用于说明该船在本时间窗内的主要活动海域。",
+      value: selectedVessel.value.low_speed_ratio ?? "暂无",
+      description: "用于衡量低速、停留或等待行为在整段轨迹中的占比。",
+      assessment: buildAssessment(lowSpeedValues, selectedVessel.value.low_speed_ratio),
     },
     {
       title: "平均海温暴露",
       value: selectedVessel.value.mean_sst ?? "暂无",
-      description: "来自真实环境匹配结果，用于补充解释环境压力。",
+      description: "基于真实环境匹配结果计算的平均海温暴露。",
+      assessment: buildAssessment(sstValues, selectedVessel.value.mean_sst),
     },
     {
       title: "平均叶绿素暴露",
       value: selectedVessel.value.mean_chlorophyll_a ?? "暂无",
-      description: "用于补充解释生物活跃环境是否可能放大污损压力。",
+      description: "用于表示生物活跃环境的相对水平。",
+      assessment: buildAssessment(chlorophyllValues, selectedVessel.value.mean_chlorophyll_a),
     },
     {
       title: "平均盐度暴露",
       value: selectedVessel.value.mean_salinity ?? "暂无",
       description: "用于区分不同水体环境下的暴露差异。",
+      assessment: buildAssessment(salinityValues, selectedVessel.value.mean_salinity),
     },
     {
-      title: "平均海流 U/V",
+      title: "海流强度",
       value:
         selectedVessel.value.mean_current_u !== null && selectedVessel.value.mean_current_v !== null
           ? `${selectedVessel.value.mean_current_u} / ${selectedVessel.value.mean_current_v}`
           : "暂无",
-      description: "用于补充解释该船所处海区的水动力环境。",
+      description: "以 U/V 分量表示的平均海流方向与强度。",
+      assessment: buildAssessment(currentIntensityValues, currentIntensity),
     },
   ];
 });
@@ -106,19 +143,6 @@ const staticFacts = computed(() => {
       description: "在有外部资料时，会优先显示更准确的尺度信息。",
     },
     {
-      title: "设计 / 观测吃水",
-      value:
-        staticProfile.value.design_draught_m !== null || staticProfile.value.observed_draught_m !== null
-          ? `${staticProfile.value.design_draught_m ?? "暂无"} / ${staticProfile.value.observed_draught_m ?? "暂无"}`
-          : "暂无",
-      description: "当前至少可从 AIS 中提取观测吃水，后续可继续补设计吃水。",
-    },
-    {
-      title: "主要目的地 / 航行状态",
-      value: `${staticProfile.value.dominant_destination || "暂无"} / ${staticProfile.value.dominant_nav_status || "暂无"}`,
-      description: "这是 AIS 派生画像中的基础行为特征。",
-    },
-    {
       title: "最近港口 / 锚地",
       value: nearestReference.value ? `${nearestReference.value.name}（${nearestReference.value.site_type}）` : "暂无",
       description: nearestReference.value
@@ -146,129 +170,38 @@ const validationFacts = computed(() => {
       value: validationSummary.value.latest_port_name || "暂无",
       description: "用于将分析判断与真实港口或案例位置对齐。",
     },
-    {
-      title: "外部来源数",
-      value: validationSummary.value.source_count,
-      description: "帮助快速了解当前校验覆盖的来源广度。",
-    },
   ];
 });
 
-const trackSummary = computed(() => {
-  if (!vesselTrack.value) return [];
-  return [
-    {
-      title: "原始轨迹点",
-      value: vesselTrack.value.point_count,
-      description: "后台保留的真实轨迹点数量。",
-    },
-    {
-      title: "前端渲染点",
-      value: vesselTrack.value.rendered_point_count,
-      description: "为保持可读性进行了抽样，但仍保留整体走向。",
-    },
-    {
-      title: "低速点数",
-      value: vesselTrack.value.low_speed_point_count,
-      description: "低速点越多，越值得关注停留与暴露积累。",
-    },
-  ];
-});
-
-const trendSummary = computed(() => {
-  if (!vesselTrend.value?.windows?.length) return [];
-  const windows = vesselTrend.value.windows;
-  const topPointWindow = [...windows].sort((a, b) => b.point_count - a.point_count)[0];
-  const topLowSpeedWindow = [...windows].sort((a, b) => (b.low_speed_ratio ?? 0) - (a.low_speed_ratio ?? 0))[0];
-  const topSpeedWindow = [...windows].sort((a, b) => (b.mean_sog ?? 0) - (a.mean_sog ?? 0))[0];
-
-  return [
-    {
-      title: "记录最密集时段",
-      value: topPointWindow?.window_start || "暂无",
-      description: `该时段共记录 ${topPointWindow?.point_count ?? 0} 个轨迹点。`,
-    },
-    {
-      title: "低速暴露最高时段",
-      value: topLowSpeedWindow?.window_start || "暂无",
-      description: `该时段低速比例为 ${topLowSpeedWindow?.low_speed_ratio ?? "暂无"}。`,
-    },
-    {
-      title: "平均航速最高时段",
-      value: topSpeedWindow?.window_start || "暂无",
-      description: `该时段平均航速约为 ${topSpeedWindow?.mean_sog ?? "暂无"} 节。`,
-    },
-  ];
-});
-
-const recommendationExplanation = computed(() => {
-  if (!selectedVessel.value) return "";
-  const mapping = {
-    "Prioritize cleaning assessment":
-      "当前规则判断该船值得优先检查维护窗口，适合作为清洗与进一步排查的重点对象。",
-    "Monitor exposure trend":
-      "当前规则判断该船尚未进入最高优先级，但存在持续暴露积累，适合继续跟踪趋势变化。",
-    "Low immediate concern":
-      "当前规则判断该船在本时间窗内的即时暴露压力较低，可暂列为较低优先级对象。",
-  };
-  return mapping[selectedVessel.value.recommendation] || "这是当前首版规则系统给出的建议结果。";
-});
-
-const svgTrack = computed(() => {
-  if (!vesselTrack.value?.points?.length) return null;
-
-  const width = 920;
-  const height = 460;
-  const padding = 36;
-  const minLon = vesselTrack.value.min_longitude;
-  const maxLon = vesselTrack.value.max_longitude;
-  const minLat = vesselTrack.value.min_latitude;
-  const maxLat = vesselTrack.value.max_latitude;
-  const lonRange = Math.max(maxLon - minLon, 0.0001);
-  const latRange = Math.max(maxLat - minLat, 0.0001);
-
-  const project = (point) => {
-    const x = padding + ((point.longitude - minLon) / lonRange) * (width - padding * 2);
-    const y = height - padding - ((point.latitude - minLat) / latRange) * (height - padding * 2);
-    return { ...point, x, y };
-  };
-
-  const projected = vesselTrack.value.points.map(project);
-  const path = projected
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`)
-    .join(" ");
-
-  return {
-    width,
-    height,
-    path,
-    lowSpeedPoints: projected.filter((point) => point.is_low_speed).slice(0, 48),
-    start: projected[0],
-    end: projected[projected.length - 1],
-  };
+const compactSummary = computed(() => {
+  if (!selectedVessel.value || !vesselTrack.value) return "";
+  return `轨迹记录 ${vesselTrack.value.point_count} 点，时间跨度 ${selectedVessel.value.track_duration_hours} 小时，低速暴露比例 ${selectedVessel.value.low_speed_ratio ?? "暂无"}，建议为“${selectedVessel.value.recommendation}”。`;
 });
 
 const svgTrend = computed(() => {
   if (!vesselTrend.value?.windows?.length) return null;
 
   const width = 920;
-  const height = 340;
-  const paddingX = 44;
-  const topPadding = 28;
-  const bottomPadding = 44;
-  const innerWidth = width - paddingX * 2;
+  const height = 360;
+  const paddingLeft = 54;
+  const paddingRight = 54;
+  const topPadding = 24;
+  const bottomPadding = 56;
+  const innerWidth = width - paddingLeft - paddingRight;
   const innerHeight = height - topPadding - bottomPadding;
   const windows = vesselTrend.value.windows;
-  const maxSog = Math.max(vesselTrend.value.max_mean_sog || 0, 0.1);
-  const maxLowSpeed = Math.max(vesselTrend.value.max_low_speed_ratio || 0, 0.1);
+  const maxSog = Math.max(vesselTrend.value.max_mean_sog || 0, 1);
+  const maxPointCount = Math.max(vesselTrend.value.max_point_count || 1, 1);
+  const lowSpeedMax = 1;
 
   const projectX = (index) => {
     if (windows.length === 1) return width / 2;
-    return paddingX + (index / (windows.length - 1)) * innerWidth;
+    return paddingLeft + (index / (windows.length - 1)) * innerWidth;
   };
 
-  const projectSogY = (value) => topPadding + innerHeight - ((value || 0) / maxSog) * innerHeight;
-  const projectLowSpeedY = (value) => topPadding + innerHeight - ((value || 0) / maxLowSpeed) * innerHeight;
+  const projectSogY = (value) => topPadding + innerHeight - (((value || 0) / maxSog) * innerHeight);
+  const projectLowSpeedY = (value) =>
+    topPadding + innerHeight - (((value || 0) / lowSpeedMax) * innerHeight);
 
   const speedPath = windows
     .map((item, index) => `${index === 0 ? "M" : "L"} ${projectX(index).toFixed(2)} ${projectSogY(item.mean_sog).toFixed(2)}`)
@@ -282,10 +215,9 @@ const svgTrend = computed(() => {
 
   const bars = windows.map((item, index) => {
     const x = projectX(index) - 12;
-    const barHeight = (item.point_count / Math.max(vesselTrend.value.max_point_count, 1)) * innerHeight;
+    const barHeight = ((item.point_count || 0) / maxPointCount) * innerHeight;
     return {
       label: item.window_start.slice(5, 16).replace("T", " "),
-      pointCount: item.point_count,
       x,
       y: topPadding + innerHeight - barHeight,
       width: 24,
@@ -293,8 +225,20 @@ const svgTrend = computed(() => {
       cx: projectX(index),
       sogY: projectSogY(item.mean_sog),
       lowSpeedY: projectLowSpeedY(item.low_speed_ratio),
+      meanSog: item.mean_sog,
+      lowSpeedRatio: item.low_speed_ratio,
     };
   });
+
+  const speedAxis = [0, maxSog / 2, maxSog].map((value) => ({
+    value: value.toFixed(1),
+    y: projectSogY(value),
+  }));
+
+  const ratioAxis = [0, 0.5, 1].map((value) => ({
+    value: `${Math.round(value * 100)}%`,
+    y: projectLowSpeedY(value),
+  }));
 
   return {
     width,
@@ -302,8 +246,20 @@ const svgTrend = computed(() => {
     bars,
     speedPath,
     lowSpeedPath,
+    speedAxis,
+    ratioAxis,
+    paddingLeft,
+    paddingRight,
+    topPadding,
+    bottomPadding,
   };
 });
+
+function onSelectMmsi(event) {
+  const nextValue = event.target.value;
+  if (!nextValue || nextValue === route.params.mmsi) return;
+  router.push(`/vessels/${nextValue}`);
+}
 
 async function loadPageData() {
   pageError.value = "";
@@ -319,6 +275,7 @@ async function loadPageData() {
       throw new Error("当前没有可用的单船详情数据。");
     }
 
+    selectedMmsi.value = mmsi;
     vesselDetail.value = await fetchVesselDetail(mmsi);
     reportPreview.value = await fetchVesselReportPreview(mmsi);
 
@@ -358,10 +315,22 @@ watch(
   </section>
 
   <template v-else-if="selectedVessel && vesselDetail">
+    <section class="page-card selector-card">
+      <label class="selector-label" for="mmsi-select">
+        查看对象
+        <HintTooltip text="按综合风险优先级排序，可直接切换查看不同 MMSI 的单船详情。" />
+      </label>
+      <select id="mmsi-select" class="selector-input" :value="selectedMmsi" @change="onSelectMmsi">
+        <option v-for="item in vesselOptions" :key="item.value" :value="item.value">
+          {{ item.label }}
+        </option>
+      </select>
+    </section>
+
     <section class="hero-grid">
       <article class="page-card hero-copy-card">
         <p class="section-kicker">Vessel Detail</p>
-        <h2>单船暴露诊断与轨迹判读</h2>
+        <h2>单船暴露诊断与 AIS 轨迹判读</h2>
         <p class="support-text">
           页面集中展示单船轨迹、时间趋势、环境暴露、船舶画像与校验摘要，用于支持对象级风险判读。
         </p>
@@ -369,7 +338,7 @@ watch(
 
       <article class="page-card summary-stack">
         <div class="summary-metric">
-          <span>当前查看 MMSI</span>
+          <span>当前 MMSI</span>
           <strong>{{ selectedVessel.mmsi }}</strong>
         </div>
         <div class="summary-metric">
@@ -387,164 +356,154 @@ watch(
       </article>
     </section>
 
-    <InfoDisclosure
-      title="页面说明"
-      summary="单船页用于呈现对象级证据链，说明内容已折叠收纳。"
-    >
-      <p>
-        本页将行为证据、环境暴露、船舶画像与外部校验入口放在同一页面，减少在多个页面之间切换的成本。
-      </p>
-      <p>
-        轨迹图与趋势图用于说明船舶活动特征，画像与校验摘要用于补充对象背景和外部信息基础。
-      </p>
-    </InfoDisclosure>
-
     <section class="content-section">
       <div class="section-head">
-        <p class="section-kicker">Track</p>
-        <h3>轨迹概览</h3>
+        <p class="section-kicker">Track Map</p>
+        <h3>
+          AIS 轨迹地图
+          <HintTooltip text="轨迹基于真实 AIS 点绘制，起点、终点、低速点与最近港口/锚地参考点已叠加到同一底图上。" />
+        </h3>
       </div>
       <div class="split-grid detail-layout">
-        <article class="page-card track-card">
+        <article class="page-card map-panel-card">
+          <VesselTrackMap :track="vesselTrack" :nearest-reference="nearestReference" />
+        </article>
+        <article class="page-card list-card">
           <div class="module-head">
-            <h4>真实轨迹折线</h4>
-            <span class="status-pill" v-if="vesselTrack">已接入 API</span>
+            <h4>轨迹说明</h4>
           </div>
-          <div v-if="svgTrack" class="track-stage">
-            <svg :viewBox="`0 0 ${svgTrack.width} ${svgTrack.height}`" class="track-svg" role="img" aria-label="单船轨迹图">
-              <rect x="0" y="0" :width="svgTrack.width" :height="svgTrack.height" rx="18" class="track-bg" />
-              <path :d="svgTrack.path" class="track-line" />
-              <circle
-                v-for="point in svgTrack.lowSpeedPoints"
-                :key="`${point.timestamp}-${point.x}-${point.y}`"
-                :cx="point.x"
-                :cy="point.y"
-                r="3.2"
-                class="track-low-speed"
-              />
-              <circle :cx="svgTrack.start.x" :cy="svgTrack.start.y" r="6.5" class="track-start" />
-              <circle :cx="svgTrack.end.x" :cy="svgTrack.end.y" r="6.5" class="track-end" />
-            </svg>
+          <div class="list-row">
+            <div>
+              <strong>起点 / 终点</strong>
+              <span>绿色表示起点，橙色表示终点。</span>
+            </div>
           </div>
-          <div v-else class="empty-state track-empty">
-            {{ trackError || "当前没有可展示的轨迹数据。" }}
+          <div class="list-row">
+            <div>
+              <strong>低速位置</strong>
+              <span>浅色点表示低速活动位置抽样，用于辅助识别停留与等待区。</span>
+            </div>
+          </div>
+          <div class="list-row">
+            <div>
+              <strong>参考点</strong>
+              <span>若存在匹配，将显示最近港口或锚地参考点。</span>
+            </div>
+          </div>
+          <div v-if="trackError" class="list-row">
+            <div>
+              <strong>轨迹状态</strong>
+              <span>{{ trackError }}</span>
+            </div>
           </div>
         </article>
-
-        <InfoDisclosure
-          title="轨迹图说明"
-          summary="深色折线表示整体走向，绿色点为起点，橙色点为终点，浅色点为低速位置抽样。"
-        >
-          <p>轨迹图用于展示对象在当前时间窗内的空间活动形态与低速活动分布。</p>
-          <p>后续版本将继续增强底图叠加、时间筛选与港口参考层联动能力。</p>
-        </InfoDisclosure>
       </div>
+    </section>
+
+    <section class="page-card compact-note-card">
+      <p>{{ compactSummary }}</p>
     </section>
 
     <section class="content-section">
       <div class="section-head">
         <p class="section-kicker">Trend</p>
-        <h3>时间趋势</h3>
+        <h3>
+          时间趋势
+          <HintTooltip text="左轴为平均航速，右轴为低速比例，柱体表示每个时间窗内的轨迹点数量。" />
+        </h3>
       </div>
-      <div class="split-grid detail-layout">
-        <article class="page-card trend-card">
-          <div class="module-head">
-            <h4>{{ vesselTrend ? `${vesselTrend.interval_hours} 小时分窗趋势` : "时间趋势图" }}</h4>
-            <span class="status-pill" v-if="vesselTrend">真实分窗</span>
+      <article class="page-card trend-card">
+        <div class="module-head">
+          <h4>{{ vesselTrend ? `${vesselTrend.interval_hours} 小时分窗趋势` : "时间趋势图" }}</h4>
+          <span class="status-pill" v-if="vesselTrend">真实分窗</span>
+        </div>
+        <div v-if="svgTrend" class="trend-stage">
+          <svg :viewBox="`0 0 ${svgTrend.width} ${svgTrend.height}`" class="trend-svg" role="img" aria-label="单船时间趋势图">
+            <rect x="0" y="0" :width="svgTrend.width" :height="svgTrend.height" rx="18" class="trend-bg" />
+            <line
+              v-for="axis in svgTrend.speedAxis"
+              :key="`speed-axis-${axis.value}`"
+              :x1="svgTrend.paddingLeft"
+              :x2="svgTrend.width - svgTrend.paddingRight"
+              :y1="axis.y"
+              :y2="axis.y"
+              class="trend-grid-line"
+            />
+            <text
+              v-for="axis in svgTrend.speedAxis"
+              :key="`speed-label-${axis.value}`"
+              :x="10"
+              :y="axis.y + 4"
+              class="trend-axis-label"
+            >
+              {{ axis.value }}
+            </text>
+            <text
+              v-for="axis in svgTrend.ratioAxis"
+              :key="`ratio-label-${axis.value}`"
+              :x="svgTrend.width - 42"
+              :y="axis.y + 4"
+              class="trend-axis-label"
+            >
+              {{ axis.value }}
+            </text>
+            <rect
+              v-for="bar in svgTrend.bars"
+              :key="`bar-${bar.label}`"
+              :x="bar.x"
+              :y="bar.y"
+              :width="bar.width"
+              :height="bar.height"
+              rx="6"
+              class="trend-bar"
+            />
+            <path :d="svgTrend.speedPath" class="trend-speed-line" />
+            <path :d="svgTrend.lowSpeedPath" class="trend-low-line" />
+            <circle
+              v-for="bar in svgTrend.bars"
+              :key="`speed-${bar.label}`"
+              :cx="bar.cx"
+              :cy="bar.sogY"
+              r="4"
+              class="trend-speed-dot"
+            />
+            <circle
+              v-for="bar in svgTrend.bars"
+              :key="`slow-${bar.label}`"
+              :cx="bar.cx"
+              :cy="bar.lowSpeedY"
+              r="4"
+              class="trend-low-dot"
+            />
+          </svg>
+          <div class="trend-labels">
+            <span v-for="bar in svgTrend.bars" :key="bar.label">{{ bar.label }}</span>
           </div>
-          <div v-if="svgTrend" class="trend-stage">
-            <svg :viewBox="`0 0 ${svgTrend.width} ${svgTrend.height}`" class="trend-svg" role="img" aria-label="单船时间趋势图">
-              <rect x="0" y="0" :width="svgTrend.width" :height="svgTrend.height" rx="18" class="trend-bg" />
-              <rect
-                v-for="bar in svgTrend.bars"
-                :key="`bar-${bar.label}`"
-                :x="bar.x"
-                :y="bar.y"
-                :width="bar.width"
-                :height="bar.height"
-                rx="6"
-                class="trend-bar"
-              />
-              <path :d="svgTrend.speedPath" class="trend-speed-line" />
-              <path :d="svgTrend.lowSpeedPath" class="trend-low-line" />
-              <circle
-                v-for="bar in svgTrend.bars"
-                :key="`speed-${bar.label}`"
-                :cx="bar.cx"
-                :cy="bar.sogY"
-                r="4"
-                class="trend-speed-dot"
-              />
-              <circle
-                v-for="bar in svgTrend.bars"
-                :key="`slow-${bar.label}`"
-                :cx="bar.cx"
-                :cy="bar.lowSpeedY"
-                r="4"
-                class="trend-low-dot"
-              />
-            </svg>
-            <div class="trend-labels">
-              <span v-for="bar in svgTrend.bars" :key="bar.label">{{ bar.label }}</span>
-            </div>
+          <div class="trend-legend">
+            <span><i class="legend-swatch legend-swatch--bar"></i> 轨迹点数</span>
+            <span><i class="legend-swatch legend-swatch--speed"></i> 平均航速</span>
+            <span><i class="legend-swatch legend-swatch--slow"></i> 低速比例</span>
           </div>
-          <div v-else class="empty-state track-empty">
-            {{ trendError || "当前没有可展示的趋势数据。" }}
-          </div>
-        </article>
-
-        <InfoDisclosure
-          title="趋势图说明"
-          summary="柱体表示记录点数量，蓝线表示平均航速，橙线表示低速比例。"
-        >
-          <p>趋势图用于识别轨迹记录密度、速度变化和低速暴露在不同时间段的变化情况。</p>
-          <p>该图是单船建议解释的重要证据之一，用于支撑对象级风险判断。</p>
-        </InfoDisclosure>
-      </div>
-    </section>
-
-    <section class="content-section">
-      <div class="section-head">
-        <p class="section-kicker">Summaries</p>
-        <h3>轨迹与趋势摘要</h3>
-      </div>
-      <div class="card-grid">
-        <article v-for="item in trackSummary" :key="item.title" class="page-card module-card">
-          <div class="module-head">
-            <h4>{{ item.title }}</h4>
-          </div>
-          <p class="feature-highlight small">{{ item.value }}</p>
-          <p>{{ item.description }}</p>
-        </article>
-        <article v-for="item in trendSummary" :key="item.title" class="page-card module-card">
-          <div class="module-head">
-            <h4>{{ item.title }}</h4>
-          </div>
-          <p class="feature-highlight small">{{ item.value }}</p>
-          <p>{{ item.description }}</p>
-        </article>
-      </div>
-    </section>
-
-    <section class="content-section">
-      <div class="section-head">
-        <p class="section-kicker">Recommendation</p>
-        <h3>建议解释</h3>
-      </div>
-      <article class="page-card text-card">
-        <p>{{ recommendationExplanation }}</p>
+        </div>
+        <div v-else class="empty-state track-empty">
+          {{ trendError || "当前没有可展示的趋势数据。" }}
+        </div>
       </article>
     </section>
 
     <section class="content-section">
       <div class="section-head">
         <p class="section-kicker">Signals</p>
-        <h3>单船关键字段</h3>
+        <h3>
+          单船关键字段
+          <HintTooltip text="相对高低基于当前样本内的相对分布，不是外部绝对阈值。" />
+        </h3>
       </div>
       <div class="card-grid">
         <article v-for="item in vesselFacts" :key="item.title" class="page-card module-card">
           <div class="module-head">
             <h4>{{ item.title }}</h4>
+            <span v-if="item.assessment" class="status-pill">{{ item.assessment }}</span>
           </div>
           <p class="feature-highlight small">{{ item.value }}</p>
           <p>{{ item.description }}</p>
@@ -596,8 +555,8 @@ watch(
 
     <section class="content-section">
       <div class="section-head">
-        <p class="section-kicker">Switch</p>
-        <h3>重点对象切换</h3>
+        <p class="section-kicker">Peers</p>
+        <h3>相邻优先级对象</h3>
       </div>
       <article class="page-card list-card">
         <RouterLink

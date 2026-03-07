@@ -1,62 +1,85 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
-import InfoDisclosure from "../components/InfoDisclosure.vue";
+import HintTooltip from "../components/HintTooltip.vue";
+import RiskOverviewMap from "../components/RiskOverviewMap.vue";
 import { useDemoData } from "../composables/useDemoData";
 
-const { summary, vessels, riskCells, loading, error, fetchDemoData, fetchOverviewReportPreview } = useDemoData();
+const {
+  summary,
+  vessels,
+  riskCells,
+  loading,
+  error,
+  fetchDemoData,
+  fetchRegionalStats,
+  fetchOverviewReportPreview,
+} = useDemoData();
 
+const regionalStats = ref(null);
 const overviewReport = ref(null);
+const activeLayer = ref("rri_score");
+const selectedHotspotKey = ref("");
 
-const moduleCards = [
-  {
-    title: "单船分析",
-    status: "已接入真实结果",
-    description: "展示单船风险评分、轨迹、时间趋势、船舶画像与维护建议。",
-  },
-  {
-    title: "区域风险识别",
-    status: "已接入真实结果",
-    description: "展示研究区格网风险、热点解释、参考点匹配与图层切换。",
-  },
-  {
-    title: "报告预览",
-    status: "已接入 API",
-    description: "总览页与单船页可直接读取后端生成的报告片段，用于展示结果交付形式。",
-  },
-  {
-    title: "情景模拟",
-    status: "预留结构",
-    description: "1.0 阶段保留产品入口，后续用于比较不同维护策略下的风险变化。",
-  },
+const layerOptions = [
+  { key: "rri_score", title: "综合风险", shortLabel: "RRI" },
+  { key: "traffic_score", title: "交通暴露", shortLabel: "交通" },
+  { key: "low_speed_score", title: "低速暴露", shortLabel: "低速" },
+  { key: "environment_score", title: "环境暴露", shortLabel: "环境" },
 ];
 
-const topVessels = computed(() => vessels.value.slice(0, 6));
-const topRiskCells = computed(() => riskCells.value.slice(0, 6));
+const topVessels = computed(() => vessels.value.slice(0, 8));
+const referenceSites = computed(() => regionalStats.value?.reference_sites || []);
+const layerMeta = computed(() => layerOptions.find((item) => item.key === activeLayer.value) || layerOptions[0]);
 
-const recommendationPairs = computed(() => {
-  if (!summary.value) return [];
+const sortedCells = computed(() =>
+  [...riskCells.value]
+    .filter((cell) => cell[activeLayer.value] !== null && cell[activeLayer.value] !== undefined)
+    .sort((left, right) => (right[activeLayer.value] || 0) - (left[activeLayer.value] || 0)),
+);
+
+const topCells = computed(() => sortedCells.value.slice(0, 8));
+
+const selectedHotspot = computed(() => {
+  if (!sortedCells.value.length) return null;
+  if (!selectedHotspotKey.value) return sortedCells.value[0];
+  return sortedCells.value.find((item) => `${item.grid_lat}-${item.grid_lon}` === selectedHotspotKey.value) || sortedCells.value[0];
+});
+
+const hotspotSummary = computed(() => {
+  const cell = selectedHotspot.value;
+  if (!cell) return [];
   return [
-    ["优先评估清洗", summary.value.recommendation_counts["Prioritize cleaning assessment"] || 0],
-    ["持续监测趋势", summary.value.recommendation_counts["Monitor exposure trend"] || 0],
-    ["低即时关注", summary.value.recommendation_counts["Low immediate concern"] || 0],
+    { label: "综合风险", value: cell.rri_score },
+    { label: "交通暴露", value: cell.traffic_score },
+    { label: "低速暴露", value: cell.low_speed_score },
+    { label: "环境暴露", value: cell.environment_score },
   ];
 });
 
-function hotspotQuery(item) {
-  return {
-    path: "/regional-risk",
-    query: {
-      layer: "rri_score",
-      hotspot: `${item.grid_lat}-${item.grid_lon}`,
-    },
-  };
+function selectLayer(layerKey) {
+  activeLayer.value = layerKey;
+  if (sortedCells.value.length) {
+    selectedHotspotKey.value = `${sortedCells.value[0].grid_lat}-${sortedCells.value[0].grid_lon}`;
+  }
+}
+
+function selectHotspot(keyOrCell) {
+  if (typeof keyOrCell === "string") {
+    selectedHotspotKey.value = keyOrCell;
+    return;
+  }
+  selectedHotspotKey.value = `${keyOrCell.grid_lat}-${keyOrCell.grid_lon}`;
 }
 
 onMounted(async () => {
   try {
     await fetchDemoData();
+    regionalStats.value = await fetchRegionalStats();
     overviewReport.value = await fetchOverviewReportPreview();
+    if (sortedCells.value.length) {
+      selectedHotspotKey.value = `${sortedCells.value[0].grid_lat}-${sortedCells.value[0].grid_lon}`;
+    }
   } catch {
     // Shared loading and error state already handles rendering.
   }
@@ -72,18 +95,14 @@ onMounted(async () => {
     {{ error }}
   </section>
 
-  <template v-else-if="summary">
+  <template v-else-if="summary && regionalStats">
     <section class="hero-grid">
       <article class="page-card hero-copy-card">
         <p class="section-kicker">Overview</p>
         <h2>新加坡海峡船舶生物污损风险总览</h2>
         <p class="support-text">
-          平台基于 AIS 航迹与海洋环境数据，对研究区内船舶暴露水平、区域热点分布与维护优先级进行集中展示。
+          平台基于 AIS 航迹与海洋环境数据，对研究区内区域热点、重点船舶与维护优先级进行统一展示。
         </p>
-        <div class="hero-actions">
-          <RouterLink class="cta-link" :to="`/vessels/${summary.top_vessel.mmsi}`">查看重点船舶</RouterLink>
-          <RouterLink class="cta-link secondary" to="/regional-risk">查看区域风险页</RouterLink>
-        </div>
       </article>
 
       <article class="page-card summary-stack">
@@ -100,38 +119,20 @@ onMounted(async () => {
           <strong>{{ summary.grid_cells }}</strong>
         </div>
         <div class="summary-metric">
-          <span>当前重点船舶</span>
+          <span>
+            当前重点船舶
+            <HintTooltip text="指当前样本中综合风险排序最高的船舶对象。" />
+          </span>
           <strong>{{ summary.top_vessel.mmsi }}</strong>
         </div>
       </article>
-    </section>
-
-    <section class="content-section">
-      <div class="section-head">
-        <p class="section-kicker">Map</p>
-        <h3>区域主地图</h3>
-      </div>
-      <article class="page-card map-card map-card-compact">
-        <iframe src="/demo/regional_demo_map.html" title="区域风险主地图"></iframe>
-      </article>
-      <InfoDisclosure
-        title="地图说明"
-        summary="首页优先展示真实区域地图，用于直接呈现研究区热点分布与空间范围。"
-      >
-        <p>
-          该地图基于当前真实格网结果生成，展示研究区内风险热区与重点轨迹分布，是平台空间分析能力的主要入口。
-        </p>
-        <p>
-          用户进入首页后，可先通过地图确认研究区范围、热点位置与轨迹分布，再进入单船页或区域页查看更细的解释信息。
-        </p>
-      </InfoDisclosure>
     </section>
 
     <section class="stats-grid">
       <article class="page-card stat-card">
         <span class="stat-label">高风险格网</span>
         <strong class="stat-value">{{ summary.high_risk_cells }}</strong>
-        <p>代表当前时间窗内风险水平最高的区域热点。</p>
+        <p>代表当前时间窗内风险水平最高的空间热点。</p>
       </article>
       <article class="page-card stat-card">
         <span class="stat-label">中风险格网</span>
@@ -150,30 +151,108 @@ onMounted(async () => {
       </article>
     </section>
 
-    <InfoDisclosure
-      title="总览页说明"
-      summary="总览页用于集中呈现区域空间结果、总体统计和重点对象列表。"
-    >
-      <p>
-        当前页面已接入真实 AIS 与环境处理结果，因此地图、榜单、统计值和报告片段均来自真实样本，而不是静态占位内容。
-      </p>
-      <p>
-        1.0 阶段的重点是形成清晰、正式、可解释的分析总入口，而不是在首页堆叠过多操作指引。
-      </p>
-    </InfoDisclosure>
+    <section class="content-section">
+      <div class="section-head">
+        <p class="section-kicker">Spatial View</p>
+        <h3>
+          区域主地图
+          <HintTooltip text="地图基于真实风险格网绘制，显示加密后的展示网格、热点区域与港口/锚地参考点。" />
+        </h3>
+      </div>
+      <div class="split-grid detail-layout dashboard-map-layout">
+        <article class="page-card map-panel-card">
+          <RiskOverviewMap
+            :cells="riskCells"
+            :active-layer="activeLayer"
+            :selected-hotspot-key="selectedHotspotKey"
+            :reference-sites="referenceSites"
+            @select-hotspot="selectHotspot"
+          />
+        </article>
+
+        <div class="dashboard-side-stack">
+          <article class="page-card layer-switch-card">
+            <button
+              v-for="item in layerOptions"
+              :key="item.key"
+              type="button"
+              class="layer-chip"
+              :class="{ active: item.key === activeLayer }"
+              @click="selectLayer(item.key)"
+            >
+              <strong>{{ item.title }}</strong>
+              <span>按 {{ item.shortLabel }} 分值排序与着色</span>
+            </button>
+          </article>
+
+          <article v-if="selectedHotspot" class="page-card list-card">
+            <div class="module-head">
+              <h4>
+                当前热点格网
+                <HintTooltip text="热点说明会随图层切换而变化，点击地图或列表中的格网即可切换。" />
+              </h4>
+            </div>
+            <div class="list-row">
+              <div>
+                <strong>{{ selectedHotspot.grid_lat }}, {{ selectedHotspot.grid_lon }}</strong>
+                <span>
+                  {{ selectedHotspot.risk_level }}风险，{{ selectedHotspot.vessel_count }} 艘船经过，
+                  最近参考点 {{ selectedHotspot.nearest_reference_name || "暂无" }}
+                </span>
+              </div>
+              <div class="list-metric">
+                <div>{{ layerMeta.shortLabel }} {{ selectedHotspot[activeLayer] }}</div>
+                <div>RRI {{ selectedHotspot.rri_score }}</div>
+              </div>
+            </div>
+            <div v-for="item in hotspotSummary" :key="item.label" class="list-row hotspot-row">
+              <div>
+                <strong>{{ item.label }}</strong>
+              </div>
+              <div class="list-metric">{{ item.value }}</div>
+            </div>
+          </article>
+
+          <article class="page-card list-card">
+            <div class="module-head">
+              <h4>
+                热点格网列表
+                <HintTooltip text="列表与地图使用相同图层口径，切换图层后排序会同步更新。" />
+              </h4>
+            </div>
+            <button
+              v-for="item in topCells"
+              :key="`${item.grid_lat}-${item.grid_lon}`"
+              type="button"
+              class="list-row list-button"
+              :class="{ active: `${item.grid_lat}-${item.grid_lon}` === selectedHotspotKey }"
+              @click="selectHotspot(item)"
+            >
+              <div>
+                <strong>{{ item.grid_lat }}, {{ item.grid_lon }}</strong>
+                <span>{{ item.risk_level }}风险，{{ item.vessel_count }} 艘船经过</span>
+              </div>
+              <div class="list-metric">
+                <div>{{ layerMeta.shortLabel }} {{ item[activeLayer] }}</div>
+                <div>{{ item.traffic_points }} 点</div>
+              </div>
+            </button>
+          </article>
+        </div>
+      </div>
+    </section>
 
     <section class="content-section">
       <div class="section-head">
-        <p class="section-kicker">Modules</p>
-        <h3>已接入的主要模块</h3>
+        <p class="section-kicker">Visuals</p>
+        <h3>可视化摘要</h3>
       </div>
-      <div class="card-grid">
-        <article v-for="item in moduleCards" :key="item.title" class="page-card module-card">
-          <div class="module-head">
-            <h4>{{ item.title }}</h4>
-            <span class="status-pill">{{ item.status }}</span>
-          </div>
-          <p>{{ item.description }}</p>
+      <div class="split-grid">
+        <article class="page-card image-card">
+          <img src="/demo/recommendation_breakdown.png" alt="船舶建议分布图" />
+        </article>
+        <article class="page-card image-card">
+          <img src="/demo/top_vessels_fpi.png" alt="高风险船舶图" />
         </article>
       </div>
     </section>
@@ -181,7 +260,10 @@ onMounted(async () => {
     <section class="content-section">
       <div class="section-head">
         <p class="section-kicker">Vessels</p>
-        <h3>重点船舶列表</h3>
+        <h3>
+          重点船舶列表
+          <HintTooltip text="按综合风险排序，点击后进入单船详情页。" />
+        </h3>
       </div>
       <article class="page-card list-card">
         <RouterLink
@@ -204,81 +286,12 @@ onMounted(async () => {
 
     <section class="content-section">
       <div class="section-head">
-        <p class="section-kicker">Hotspots</p>
-        <h3>重点区域列表</h3>
-      </div>
-      <article class="page-card list-card">
-        <RouterLink
-          v-for="item in topRiskCells"
-          :key="`${item.grid_lat}-${item.grid_lon}`"
-          class="list-row link-row"
-          :to="hotspotQuery(item)"
-        >
-          <div>
-            <strong>{{ item.grid_lat }}, {{ item.grid_lon }}</strong>
-            <span>{{ item.risk_level }}风险，{{ item.vessel_count }} 艘船经过</span>
-          </div>
-          <div class="list-metric">
-            <div>RRI {{ item.rri_score }}</div>
-            <div>{{ item.traffic_points }} 点</div>
-          </div>
-        </RouterLink>
-      </article>
-    </section>
-
-    <section class="content-section">
-      <div class="section-head">
-        <p class="section-kicker">Guide</p>
-        <h3>建议类别说明</h3>
-      </div>
-      <InfoDisclosure
-        title="判读口径"
-        summary="三类建议用于说明当前样本中不同对象的维护优先级。"
-      >
-        <p>
-          “优先评估清洗”表示该船在当前时间窗下呈现较高的综合暴露水平，适合作为维护窗口排查对象。
-        </p>
-        <p>
-          “持续监测趋势”表示对象尚未达到最高优先级，但已存在持续暴露积累，需要继续观察。
-        </p>
-        <p>
-          “低即时关注”表示当前窗口内暴露压力较低，可作为低优先级对象暂缓处理。
-        </p>
-      </InfoDisclosure>
-      <article class="page-card list-card">
-        <div v-for="[label, value] in recommendationPairs" :key="label" class="list-row">
-          <div>
-            <strong>{{ label }}</strong>
-            <span>用于辅助理解当前批次的维护建议分布。</span>
-          </div>
-          <div class="list-metric">{{ value }} 艘</div>
-        </div>
-      </article>
-    </section>
-
-    <section class="content-section">
-      <div class="section-head">
         <p class="section-kicker">Report</p>
         <h3>总览报告预览</h3>
       </div>
       <article class="page-card text-card">
         <p v-for="line in overviewReport?.lines || []" :key="line">{{ line }}</p>
       </article>
-    </section>
-
-    <section class="content-section">
-      <div class="section-head">
-        <p class="section-kicker">Evidence</p>
-        <h3>辅助图表</h3>
-      </div>
-      <div class="split-grid">
-        <article class="page-card image-card">
-          <img src="/demo/recommendation_breakdown.png" alt="船舶建议分布图" />
-        </article>
-        <article class="page-card image-card">
-          <img src="/demo/top_vessels_fpi.png" alt="高风险船舶图" />
-        </article>
-      </div>
     </section>
   </template>
 </template>

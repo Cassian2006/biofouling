@@ -8,26 +8,29 @@ def read_text(relative_path: str) -> str:
     return (ROOT / relative_path).read_text(encoding="utf-8")
 
 
-def test_info_disclosure_component_exists() -> None:
-    content = read_text("frontend/src/components/InfoDisclosure.vue")
+def test_tooltip_and_map_components_exist() -> None:
+    tooltip = read_text("frontend/src/components/HintTooltip.vue")
+    overview_map = read_text("frontend/src/components/RiskOverviewMap.vue")
+    vessel_map = read_text("frontend/src/components/VesselTrackMap.vue")
 
-    assert "<details" in content
-    assert "展开说明" in content
+    assert "hint-tooltip__bubble" in tooltip
+    assert "leaflet" in overview_map.lower()
+    assert "leaflet" in vessel_map.lower()
 
 
-def test_core_pages_use_collapsible_explanations() -> None:
+def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
     dashboard = read_text("frontend/src/pages/DashboardPage.vue")
     vessel = read_text("frontend/src/pages/VesselDetailPage.vue")
-    regional = read_text("frontend/src/pages/RegionalRiskPage.vue")
+    router = read_text("frontend/src/router.js")
+    app_shell = read_text("frontend/src/App.vue")
 
-    assert "InfoDisclosure" in dashboard
+    assert "RiskOverviewMap" in dashboard
     assert "区域主地图" in dashboard
-    assert "/demo/regional_demo_map.html" in dashboard
+    assert "已接入的主要模块" not in dashboard
 
-    assert "InfoDisclosure" in vessel
-    assert "轨迹图说明" in vessel
-    assert "趋势图说明" in vessel
+    assert "VesselTrackMap" in vessel
+    assert "selector-input" in vessel
+    assert "单船关键字段" in vessel
 
-    assert "InfoDisclosure" in regional
-    assert "图层说明" in regional
-    assert "地图说明" in regional
+    assert 'redirect: "/"' in router
+    assert 'to="/regional-risk"' not in app_shell
