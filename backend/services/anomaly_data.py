@@ -66,20 +66,30 @@ def _serialize_records(frame: pd.DataFrame) -> list[VesselAnomalyRecord]:
     return records
 
 
+def _ranked_actionable_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    actionable = frame.loc[frame["anomaly_level"] != "observation_insufficient"].copy()
+    return actionable.reset_index(drop=True)
+
+
 @lru_cache(maxsize=4)
 def _load_anomaly_payload_by_signature(signature: tuple[str, ...]) -> dict[str, object]:
     anomaly_path = _latest_anomaly_csv()
     features_path = _latest_file(PROCESSED_DIR, "vessel_features_*.csv")
     anomaly_frame = _normalize_columns(pd.read_csv(anomaly_path))
     anomaly_frame = anomaly_frame.sort_values(["anomaly_score", "mmsi"], ascending=[False, True]).reset_index(drop=True)
+    actionable_frame = _ranked_actionable_frame(anomaly_frame)
     window_label = _window_label_from_features(features_path)
     level_counts = (
-        anomaly_frame["anomaly_level"].value_counts().reindex(["highly_abnormal", "suspicious", "normal"], fill_value=0).to_dict()
+        anomaly_frame["anomaly_level"]
+        .value_counts()
+        .reindex(["highly_abnormal", "suspicious", "normal", "observation_insufficient"], fill_value=0)
+        .to_dict()
     )
-    top_anomalies = _serialize_records(anomaly_frame.head(12))
+    top_anomalies = _serialize_records(actionable_frame.head(12))
     return {
         "window_label": window_label,
         "anomaly_frame": anomaly_frame,
+        "actionable_frame": actionable_frame,
         "summary": VesselAnomalyResponse(
             window_label=window_label,
             vessel_count=int(len(anomaly_frame)),
@@ -100,6 +110,7 @@ def get_demo_anomaly_summary() -> VesselAnomalyResponse:
 def get_vessel_anomaly_detail(mmsi: str) -> VesselAnomalyDetailResponse:
     payload = load_anomaly_payload()
     anomaly_frame = payload["anomaly_frame"]  # type: ignore[assignment]
+    actionable_frame = payload["actionable_frame"]  # type: ignore[assignment]
     row = anomaly_frame.loc[anomaly_frame["mmsi"] == str(mmsi)]
     if row.empty:
         raise LookupError(f"Anomaly detail for vessel {mmsi} not found")
@@ -107,7 +118,7 @@ def get_vessel_anomaly_detail(mmsi: str) -> VesselAnomalyDetailResponse:
     record = row.iloc[0]
     rank = int(row.index[0]) + 1
     percentile_rank = round(1 - ((rank - 1) / max(len(anomaly_frame) - 1, 1)), 4)
-    peer_frame = anomaly_frame.loc[anomaly_frame["mmsi"] != str(mmsi)].head(6).reset_index(drop=True)
+    peer_frame = actionable_frame.loc[actionable_frame["mmsi"] != str(mmsi)].head(6).reset_index(drop=True)
     return VesselAnomalyDetailResponse(
         window_label=payload["window_label"],  # type: ignore[arg-type]
         mmsi=str(mmsi),

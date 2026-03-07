@@ -211,6 +211,7 @@ function buildAnomalySummaryFallback() {
       highly_abnormal: Math.min(6, ranked.length),
       suspicious: Math.min(12, Math.max(ranked.length - 6, 0)),
       normal: Math.max(vessels.value.length - 18, 0),
+      observation_insufficient: 0,
     },
     top_anomalies: ranked.slice(0, 12).map((item, index) => ({
       rank: index + 1,

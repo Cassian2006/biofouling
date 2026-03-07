@@ -76,7 +76,7 @@ def main() -> None:
         reconstruction_error.max() - reconstruction_error.min(),
         1e-9,
     )
-    anomaly_level = classify_anomaly_levels(pd.Series(anomaly_score))
+    anomaly_level = classify_anomaly_levels(pd.Series(anomaly_score), prepared)
 
     result = prepared.copy()
     result["anomaly_score"] = anomaly_score.round(6)
@@ -87,6 +87,10 @@ def main() -> None:
 
     original_standardized = pd.DataFrame(feature_matrix, columns=ANOMALY_FEATURE_COLUMNS)
     for index, row in original_standardized.iterrows():
+        if result.at[index, "anomaly_level"] == "observation_insufficient":
+            result.at[index, "explanation_1"] = "Observation window is too short for stable anomaly comparison"
+            result.at[index, "explanation_2"] = "Current vessel is excluded from anomaly ranking due to sparse coverage"
+            continue
         explanations = explain_anomaly_row(
             row,
             reconstructed_matrix[index],
@@ -98,12 +102,13 @@ def main() -> None:
 
     result = result.sort_values(["anomaly_score", "mmsi"], ascending=[False, True]).reset_index(drop=True)
     result.to_csv(output_dir / "vessel_anomaly_scores.csv", index=False)
+    actionable_result = result.loc[result["anomaly_level"] != "observation_insufficient"].reset_index(drop=True)
 
     summary = {
         "rows": int(len(result)),
         "feature_columns": ANOMALY_FEATURE_COLUMNS,
         "anomaly_level_counts": result["anomaly_level"].value_counts().to_dict(),
-        "top_vessels": result[["mmsi", "anomaly_score", "anomaly_level"]].head(10).to_dict(orient="records"),
+        "top_vessels": actionable_result[["mmsi", "anomaly_score", "anomaly_level"]].head(10).to_dict(orient="records"),
         "best_val_loss": float(metrics["best_val_loss"]),
     }
     (output_dir / "evaluation.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")

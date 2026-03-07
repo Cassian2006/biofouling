@@ -2,6 +2,10 @@ import pandas as pd
 
 from scripts.exposure_anomaly import (
     ANOMALY_FEATURE_COLUMNS,
+    HIGHLY_ABNORMAL_SCORE_THRESHOLD,
+    MIN_OBSERVATION_HOURS,
+    MIN_OBSERVATION_PINGS,
+    SUSPICIOUS_SCORE_THRESHOLD,
     classify_anomaly_levels,
     explain_anomaly_row,
     fit_scaler,
@@ -47,11 +51,21 @@ def test_transform_with_scaler_returns_standardized_matrix() -> None:
 
 def test_classify_anomaly_levels_and_explanations() -> None:
     scores = pd.Series([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
-    labels = classify_anomaly_levels(scores)
+    frame = pd.DataFrame(
+        {
+            "ping_count": [MIN_OBSERVATION_PINGS - 1] + [MIN_OBSERVATION_PINGS] * 9,
+            "track_duration_hours": [MIN_OBSERVATION_HOURS - 1] + [MIN_OBSERVATION_HOURS] * 9,
+        }
+    )
+    labels = classify_anomaly_levels(scores, frame)
 
-    assert labels.iloc[0] == "normal"
-    assert labels.iloc[-2] == "suspicious"
+    assert labels.iloc[0] == "observation_insufficient"
+    assert labels.iloc[1] == "suspicious"
+    assert labels.iloc[2] == "suspicious"
+    assert labels.iloc[3] == "highly_abnormal"
     assert labels.iloc[-1] == "highly_abnormal"
+    assert SUSPICIOUS_SCORE_THRESHOLD == 0.12
+    assert HIGHLY_ABNORMAL_SCORE_THRESHOLD == 0.35
 
     standardized = pd.Series(
         {
@@ -71,6 +85,7 @@ def test_classify_anomaly_levels_and_explanations() -> None:
 
     assert len(explanations) == 2
     assert explanations[0].startswith("ping_count")
+    assert "model reconstruction" in explanations[0]
 
 
 def test_split_train_validation_keeps_rows() -> None:

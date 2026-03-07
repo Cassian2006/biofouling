@@ -103,3 +103,23 @@
 1. 先在当前 15 天真实样本上训练首版 `Autoencoder`
 2. 看高分异常对象是否具备解释性
 3. 决定是否将异常榜单接入总览页与单船页
+# 当前分级口径补充（2026-03-07）
+
+为避免把轨迹过短、点数过少的对象误判为“高度异常”，当前分级规则已调整为两步：
+
+1. 先判断观测是否充分
+- `ping_count < 50` 或 `track_duration_hours < 12`
+- 直接标记为 `observation_insufficient`
+
+2. 对其余对象按固定分数阈值分级
+- `anomaly_score >= 0.35` -> `highly_abnormal`
+- `0.12 <= anomaly_score < 0.35` -> `suspicious`
+- `anomaly_score < 0.12` -> `normal`
+
+在当前 `637` 艘船的 15 天样本上，调整后的分布为：
+- `highly_abnormal = 16`
+- `suspicious = 70`
+- `normal = 400`
+- `observation_insufficient = 151`
+
+这样做的目的，是让“高度异常”更接近真正的暴露模式偏离，而不是被观测稀疏样本挤占。

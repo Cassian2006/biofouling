@@ -79,6 +79,7 @@ function selectHotspot(keyOrCell) {
 function levelLabel(level) {
   if (level === "highly_abnormal") return "高度异常";
   if (level === "suspicious") return "可疑异常";
+  if (level === "observation_insufficient") return "观测不足";
   return "正常";
 }
 
@@ -279,9 +280,13 @@ onMounted(async () => {
               <strong>{{ anomalyCounts.normal || 0 }}</strong>
               <span>正常</span>
             </div>
+            <div class="anomaly-chip anomaly-chip--neutral">
+              <strong>{{ anomalyCounts.observation_insufficient || 0 }}</strong>
+              <span>观测不足</span>
+            </div>
           </div>
           <p class="support-text anomaly-caption">
-            异常检测用于从同批船舶中快速筛出暴露模式明显偏离常态的对象，辅助总览页优先排查。
+            异常检测用于从同批船舶中快速筛出暴露模式明显偏离常态的对象；观测不足对象不参与异常等级比较。
           </p>
         </article>
 

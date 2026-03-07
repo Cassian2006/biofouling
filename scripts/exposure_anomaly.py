@@ -19,6 +19,11 @@ ANOMALY_FEATURE_COLUMNS = [
     "ecp_proxy",
 ]
 
+MIN_OBSERVATION_PINGS = 50
+MIN_OBSERVATION_HOURS = 12.0
+SUSPICIOUS_SCORE_THRESHOLD = 0.12
+HIGHLY_ABNORMAL_SCORE_THRESHOLD = 0.35
+
 
 @dataclass
 class ScalingStats:
@@ -108,20 +113,31 @@ def split_train_validation(
     return train, validation
 
 
-def classify_anomaly_levels(scores: pd.Series) -> pd.Series:
+def classify_anomaly_levels(
+    scores: pd.Series,
+    dataframe: pd.DataFrame | None = None,
+) -> pd.Series:
     if scores.empty:
         return pd.Series(dtype=str)
-    suspicious_threshold = float(scores.quantile(0.8))
-    highly_abnormal_threshold = float(scores.quantile(0.95))
 
-    def _label(value: float) -> str:
-        if value >= highly_abnormal_threshold:
-            return "highly_abnormal"
-        if value >= suspicious_threshold:
-            return "suspicious"
-        return "normal"
+    frame = dataframe.reindex(scores.index) if dataframe is not None else pd.DataFrame(index=scores.index)
+    ping_count = pd.to_numeric(frame["ping_count"], errors="coerce") if "ping_count" in frame else None
+    duration_hours = pd.to_numeric(frame["track_duration_hours"], errors="coerce") if "track_duration_hours" in frame else None
 
-    return scores.apply(_label)
+    labels: list[str] = []
+    for index, value in scores.items():
+        if ping_count is not None and duration_hours is not None:
+            if float(ping_count.loc[index]) < MIN_OBSERVATION_PINGS or float(duration_hours.loc[index]) < MIN_OBSERVATION_HOURS:
+                labels.append("observation_insufficient")
+                continue
+        if float(value) >= HIGHLY_ABNORMAL_SCORE_THRESHOLD:
+            labels.append("highly_abnormal")
+        elif float(value) >= SUSPICIOUS_SCORE_THRESHOLD:
+            labels.append("suspicious")
+        else:
+            labels.append("normal")
+
+    return pd.Series(labels, index=scores.index)
 
 
 def explain_anomaly_row(
@@ -139,6 +155,6 @@ def explain_anomaly_row(
 
     explanations: list[str] = []
     for column, _, delta in residuals[:top_k]:
-        direction = "高于" if delta > 0 else "低于"
-        explanations.append(f"{column} {direction}模型重建值")
+        direction = "higher than" if delta > 0 else "lower than"
+        explanations.append(f"{column} {direction} model reconstruction")
     return explanations

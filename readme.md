@@ -1565,3 +1565,32 @@ project/
 本轮验证结果：
 - `pytest`: `31 passed`
 - `frontend npm run build`: passed
+50. 1.5 异常分级策略已完成核查与调整（2026-03-07）
+本轮对异常检测分级策略做了专门复核，重点回答两个问题：
+- 当前“高度异常”占比是否过高
+- 当前分级是否混入了观测不足对象
+
+核查结论：
+- 旧规则下，`highly_abnormal = 32 / 637 = 5.02%`
+- 其中混入了一批轨迹时长过短、点数过少的对象
+- 因此问题不在“5% 这个比例本身”，而在“高度异常的语义不够干净”
+
+当前新规则：
+- 若 `ping_count < 50` 或 `track_duration_hours < 12`
+  - 先标记为 `observation_insufficient`
+- 对其余对象按固定阈值分级：
+  - `anomaly_score >= 0.35` -> `highly_abnormal`
+  - `0.12 <= anomaly_score < 0.35` -> `suspicious`
+  - `anomaly_score < 0.12` -> `normal`
+
+按新规则重算后的分布：
+- `highly_abnormal = 16`
+- `suspicious = 70`
+- `normal = 400`
+- `observation_insufficient = 151`
+
+本轮已同步：
+- 异常评估产物重算
+- 后端榜单过滤 `observation_insufficient`
+- 前端展示新增“观测不足”
+- 测试与构建通过

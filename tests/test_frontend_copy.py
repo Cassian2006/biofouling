@@ -36,6 +36,7 @@ def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
     assert "已接入的主要模块" not in dashboard
     assert "异常暴露筛查" in dashboard
     assert "异常船舶榜单" in dashboard
+    assert "观测不足" in dashboard
 
     assert "VesselTrackMap" in vessel
     assert "selector-input" in vessel
@@ -43,6 +44,7 @@ def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
     assert "预测区间" in vessel
     assert "异常暴露解释" in vessel
     assert "相邻异常对象" in vessel
+    assert "观测不足" in vessel
 
     assert 'redirect: "/"' in router
     assert 'to="/regional-risk"' not in app_shell

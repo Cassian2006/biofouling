@@ -64,6 +64,7 @@ function buildAssessment(values, value) {
 function anomalyLevelLabel(level) {
   if (level === "highly_abnormal") return "高度异常";
   if (level === "suspicious") return "可疑异常";
+  if (level === "observation_insufficient") return "观测不足";
   return "正常";
 }
 
