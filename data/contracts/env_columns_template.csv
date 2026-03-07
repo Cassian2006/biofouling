@@ -1,0 +1,9 @@
+column_name,required,dtype,description,notes
+timestamp,yes,datetime,Observation or grid timestamp,Recommend UTC ISO 8601
+latitude,yes,float,Latitude,WGS84 grid or point
+longitude,yes,float,Longitude,WGS84 grid or point
+sst,yes,float,Sea surface temperature,Core exposure variable
+salinity,no,float,Sea surface salinity,Optional first phase
+current_u,no,float,Current U component,Optional first phase
+current_v,no,float,Current V component,Optional first phase
+chlorophyll_a,no,float,Chlorophyll-a,Proxy for biological activity

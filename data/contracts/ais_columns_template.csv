@@ -1,0 +1,11 @@
+column_name,required,dtype,description,notes
+mmsi,yes,string,Ship identifier,Prefer string to preserve leading zeros
+imo,no,string,IMO identifier,Optional but useful for joins
+timestamp,yes,datetime,Message timestamp,Recommend UTC ISO 8601
+latitude,yes,float,Latitude,WGS84
+longitude,yes,float,Longitude,WGS84
+sog,no,float,Speed over ground,Keep unit consistent
+cog,no,float,Course over ground,0-360
+heading,no,float,Heading,Can be missing
+nav_status,no,string,Navigation status,Useful for anchoring/mooring logic
+ship_type,no,string,Vessel type,First phase can focus on one vessel segment

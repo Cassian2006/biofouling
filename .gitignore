@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment
+.env
+.env.*
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# Data artifacts
+data/raw/*
+data/processed/*
+data/external/*
+data/contracts/generated/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/external/.gitkeep
+!data/contracts/
+!data/contracts/**
+
+# Output artifacts
+outputs/maps/*
+outputs/reports/*
+outputs/figures/*
+!outputs/maps/.gitkeep
+!outputs/reports/.gitkeep
+!outputs/figures/.gitkeep
+
+# Frontend
+frontend/node_modules/
+frontend/dist/

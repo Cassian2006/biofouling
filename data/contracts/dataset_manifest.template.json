@@ -1,0 +1,38 @@
+{
+  "project": "biofouling",
+  "study_area": {
+    "name": "singapore_strait_v1",
+    "west": 102.9,
+    "south": 0.8,
+    "east": 104.9,
+    "north": 1.85
+  },
+  "datasets": {
+    "ais_raw": {
+      "path": "data/raw/your_ais_file.csv",
+      "format": "csv",
+      "required_columns_template": "data/contracts/ais_columns_template.csv",
+      "time_coverage": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-31T23:59:59Z"
+      },
+      "notes": "Replace with your exported AIS data file."
+    },
+    "env_raw": {
+      "path": "data/external/your_env_file.csv",
+      "format": "csv",
+      "required_columns_template": "data/contracts/env_columns_template.csv",
+      "time_coverage": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-31T23:59:59Z"
+      },
+      "notes": "Replace with your exported or converted environmental dataset."
+    }
+  },
+  "pipeline_outputs": {
+    "ais_cleaned": "data/processed/ais_cleaned.csv",
+    "env_processed": "data/processed/env_processed.csv",
+    "vessel_features": "data/processed/vessel_features.csv",
+    "voyage_report": "outputs/reports/voyage_report.md"
+  }
+}
