@@ -27,12 +27,26 @@
         "end": "2026-01-31T23:59:59Z"
       },
       "notes": "Replace with your exported or converted environmental dataset."
+    },
+    "vessel_static": {
+      "path": "data/external/vessel_static_profiles.csv",
+      "format": "csv",
+      "required_columns_template": "data/contracts/vessel_static_columns_template.csv",
+      "notes": "Optional external vessel profile table. If omitted, the system falls back to AIS-derived vessel profiles."
+    },
+    "external_validation_events": {
+      "path": "data/external/validation_events.csv",
+      "format": "csv",
+      "required_columns_template": "data/contracts/external_validation_events_template.csv",
+      "notes": "Optional event-level validation table for port calls, arrivals, departures, or other externally verified vessel events."
     }
   },
   "pipeline_outputs": {
     "ais_cleaned": "data/processed/ais_cleaned.csv",
     "env_processed": "data/processed/env_processed.csv",
     "vessel_features": "data/processed/vessel_features.csv",
+    "vessel_catalog": "data/processed/vessel_catalog.csv",
+    "validation_summary": "data/processed/validation_summary.csv",
     "voyage_report": "outputs/reports/voyage_report.md"
   }
 }

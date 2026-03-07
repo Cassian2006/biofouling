@@ -12,10 +12,47 @@ class VesselRecord(BaseModel):
     low_speed_ratio: float | None
     mean_sst: float | None
     mean_chlorophyll_a: float | None
+    mean_salinity: float | None
+    mean_current_u: float | None
+    mean_current_v: float | None
     track_duration_hours: float | None
     fpi_proxy: float | None
     ecp_proxy: float | None
     recommendation: str
+
+
+class VesselStaticProfile(BaseModel):
+    mmsi: str
+    first_seen: str | None
+    last_seen: str | None
+    vessel_name: str | None
+    imo: str | None
+    ship_type: str | None
+    flag: str | None
+    build_year: int | None
+    length_m: float | None
+    beam_m: float | None
+    design_draught_m: float | None
+    observed_draught_m: float | None
+    max_observed_draught_m: float | None
+    dwt: float | None
+    grt: float | None
+    teu: float | None
+    dominant_destination: str | None
+    dominant_nav_status: str | None
+    profile_source: str
+    static_source: str | None
+
+
+class ValidationSummary(BaseModel):
+    mmsi: str
+    event_count: int
+    source_count: int
+    sources: list[str]
+    latest_event_type: str | None
+    latest_event_start: str | None
+    latest_port_name: str | None
+    notes_count: int
 
 
 class RiskCellRecord(BaseModel):
@@ -67,6 +104,8 @@ class VesselDetailResponse(BaseModel):
     cohort_size: int
     rank_fraction: str
     peer_vessels: list[VesselRecord]
+    static_profile: VesselStaticProfile | None
+    validation_summary: ValidationSummary
 
 
 class VesselTrackPoint(BaseModel):

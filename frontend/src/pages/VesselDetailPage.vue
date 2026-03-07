@@ -25,6 +25,8 @@ const trendError = ref("");
 
 const selectedVessel = computed(() => vesselDetail.value?.vessel || null);
 const peerVessels = computed(() => vesselDetail.value?.peer_vessels || []);
+const staticProfile = computed(() => vesselDetail.value?.static_profile || null);
+const validationSummary = computed(() => vesselDetail.value?.validation_summary || null);
 
 const vesselFacts = computed(() => {
   if (!selectedVessel.value) return [];
@@ -32,17 +34,17 @@ const vesselFacts = computed(() => {
     {
       title: "轨迹时间窗",
       value: `${selectedVessel.value.track_start} -> ${selectedVessel.value.track_end}`,
-      description: "表示当前首轮真实数据中，这艘船被实际捕获到的轨迹时间范围。",
+      description: "表示这艘船在当前研究时间窗内实际被捕获到的轨迹范围。",
     },
     {
       title: "轨迹点数与时长",
       value: `${selectedVessel.value.ping_count} 点 / ${selectedVessel.value.track_duration_hours} 小时`,
-      description: "点数越多、时长越长，说明当前判断建立在更充分的行为观测之上。",
+      description: "点数越多、时长越长，说明当前判断建立在更充分的行为观察之上。",
     },
     {
       title: "低速暴露比例",
       value: `${selectedVessel.value.low_speed_ratio ?? "暂无"}`,
-      description: "低速比例是当前首版规则里最重要的行为暴露信号之一。",
+      description: "低速比例是当前规则里最重要的行为暴露信号之一。",
     },
     {
       title: "平均位置",
@@ -52,12 +54,93 @@ const vesselFacts = computed(() => {
     {
       title: "平均海温暴露",
       value: selectedVessel.value.mean_sst ?? "暂无",
-      description: "当前已接入真实环境暴露结果，后续还会继续补更细的时间切片。",
+      description: "当前已接入真实环境暴露结果，不再只看 AIS 行为本身。",
     },
     {
       title: "平均叶绿素暴露",
       value: selectedVessel.value.mean_chlorophyll_a ?? "暂无",
-      description: "这一项当前空值较多，说明首轮环境匹配仍以温度信息为主。",
+      description: "用于补充解释生物活跃环境是否可能放大污损压力。",
+    },
+    {
+      title: "平均盐度暴露",
+      value: selectedVessel.value.mean_salinity ?? "暂无",
+      description: "盐度进入后，可以开始区分不同水体环境下的暴露差异。",
+    },
+    {
+      title: "平均海流 U/V",
+      value:
+        selectedVessel.value.mean_current_u !== null && selectedVessel.value.mean_current_v !== null
+          ? `${selectedVessel.value.mean_current_u} / ${selectedVessel.value.mean_current_v}`
+          : "暂无",
+      description: "用于补充解释船舶所处海区的水动力环境。",
+    },
+  ];
+});
+
+const staticFacts = computed(() => {
+  if (!staticProfile.value) return [];
+  return [
+    {
+      title: "画像来源",
+      value: staticProfile.value.profile_source,
+      description: "当前画像是仅由 AIS 派生，还是已经融合了外部静态资料。",
+    },
+    {
+      title: "船名 / IMO",
+      value: `${staticProfile.value.vessel_name || "暂无"} / ${staticProfile.value.imo || "暂无"}`,
+      description: "后续补入外部静态表后，这里会显示更完整的识别信息。",
+    },
+    {
+      title: "船型 / 船旗",
+      value: `${staticProfile.value.ship_type || "暂无"} / ${staticProfile.value.flag || "暂无"}`,
+      description: "这是后续做船型分层和辅助解释的重要基础。",
+    },
+    {
+      title: "长度 / 型宽",
+      value:
+        staticProfile.value.length_m !== null && staticProfile.value.beam_m !== null
+          ? `${staticProfile.value.length_m}m / ${staticProfile.value.beam_m}m`
+          : "暂无",
+      description: "如果后续拿到外部资料，这里会优先显示更准确的尺度信息。",
+    },
+    {
+      title: "设计 / 观测吃水",
+      value:
+        staticProfile.value.design_draught_m !== null || staticProfile.value.observed_draught_m !== null
+          ? `${staticProfile.value.design_draught_m ?? "暂无"} / ${staticProfile.value.observed_draught_m ?? "暂无"}`
+          : "暂无",
+      description: "当前至少可以从 AIS 中得到观测吃水，后续可用外部资料补设计吃水。",
+    },
+    {
+      title: "主目的地 / 航行状态",
+      value: `${staticProfile.value.dominant_destination || "暂无"} / ${staticProfile.value.dominant_nav_status || "暂无"}`,
+      description: "这是当前由 AIS 派生出的基础船舶画像，用来补充行为解释。",
+    },
+  ];
+});
+
+const validationFacts = computed(() => {
+  if (!validationSummary.value) return [];
+  return [
+    {
+      title: "外部校验事件数",
+      value: validationSummary.value.event_count,
+      description: "表示当前是否已经有外部事件可以用来对照 AIS 与分析结果。",
+    },
+    {
+      title: "最近校验事件",
+      value: validationSummary.value.latest_event_type || "暂无",
+      description: "如果后续接入到离港或港口事件，这里会显示最近一条外部记录。",
+    },
+    {
+      title: "最近事件位置",
+      value: validationSummary.value.latest_port_name || "暂无",
+      description: "帮助把模型判断和真实港口或案例位置对应起来。",
+    },
+    {
+      title: "外部来源数",
+      value: validationSummary.value.source_count,
+      description: "后续如果有多个来源，这里能快速看出当前校验覆盖情况。",
     },
   ];
 });
@@ -97,12 +180,12 @@ const trendSummary = computed(() => {
       description: `该时间段捕获到 ${topPointWindow?.point_count ?? 0} 个点，代表当时轨迹记录最密。`,
     },
     {
-      title: "低速暴露最高时间段",
+      title: "低速暴露最高时段",
       value: topLowSpeedWindow?.window_start || "暂无",
       description: `该时间段低速比例为 ${topLowSpeedWindow?.low_speed_ratio ?? "暂无"}。`,
     },
     {
-      title: "均速最高时间段",
+      title: "均速最高时段",
       value: topSpeedWindow?.window_start || "暂无",
       description: `该时间段均速约为 ${topSpeedWindow?.mean_sog ?? "暂无"} 节。`,
     },
@@ -269,9 +352,9 @@ watch(
     <section class="hero-grid">
       <article class="page-card hero-copy-card">
         <p class="section-kicker">单船详情页</p>
-        <h2>这一页现在同时呈现真实轨迹、真实时间趋势和真实报告片段。</h2>
+        <h2>这一页现在同时呈现真实轨迹、时间趋势、船舶画像和外部校验占位。</h2>
         <p class="support-text">
-          这里想回答的问题很直接：这艘船在当前时间窗里主要怎么移动、什么时候更慢、什么时候更密集地停留，以及为什么会被系统放到当前优先级。
+          这里要回答的不只是“这艘船去了哪里”，还包括“它是什么样的船”“当前有哪些外部资料已接入”“为什么系统把它放在当前优先级”。
         </p>
       </article>
 
@@ -307,7 +390,7 @@ watch(
             <span class="status-pill" v-if="vesselTrack">已接入 API</span>
           </div>
           <p class="support-text">
-            深色折线表示轨迹整体走势，绿色点是起点，橙色点是终点，浅色点表示抽样后的低速位置。
+            深色折线表示轨迹整体走向，绿色点是起点，橙色点是终点，浅色点表示抽样后的低速位置。
           </p>
           <div v-if="svgTrack" class="track-stage">
             <svg :viewBox="`0 0 ${svgTrack.width} ${svgTrack.height}`" class="track-svg" role="img" aria-label="单船轨迹图">
@@ -336,19 +419,19 @@ watch(
           </div>
           <div class="list-row">
             <div>
-              <strong>轨迹先展示形状</strong>
-              <span>这一版先解决“真实轨迹已经接入”，帮助判断是否存在明显停留、折返和局部暴露。</span>
+              <strong>先看形状</strong>
+              <span>这一版先解决“真实轨迹是否已经接入”，帮助判断是否存在明显停留、折返和局部暴露。</span>
             </div>
           </div>
           <div class="list-row">
             <div>
-              <strong>低速点更值得关注</strong>
+              <strong>再看低速点</strong>
               <span>当前规则把低速暴露视为重要信号，所以专门标出低速点，方便看停留位置。</span>
             </div>
           </div>
           <div class="list-row">
             <div>
-              <strong>后续会升级成地图轨迹</strong>
+              <strong>后续会升级为地图轨迹</strong>
               <span>1.0 先把真实轨迹接进来，后续再加底图、时间筛选和港口锚地叠层。</span>
             </div>
           </div>
@@ -418,7 +501,7 @@ watch(
           <div class="list-row">
             <div>
               <strong>柱子看记录密度</strong>
-              <span>柱子越高，说明该时间段捕获到的轨迹点越多，通常意味着这段观察更充分。</span>
+              <span>柱子越高，说明该时间段捕获到的轨迹点越多，通常意味着观察更充分。</span>
             </div>
           </div>
           <div class="list-row">
@@ -486,6 +569,38 @@ watch(
       </div>
       <div class="card-grid">
         <article v-for="item in vesselFacts" :key="item.title" class="page-card module-card">
+          <div class="module-head">
+            <h4>{{ item.title }}</h4>
+          </div>
+          <p class="feature-highlight small">{{ item.value }}</p>
+          <p>{{ item.description }}</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="content-section">
+      <div class="section-head">
+        <p class="section-kicker">船舶画像</p>
+        <h3>这一层开始补“它是什么样的船”，而不只看“它做了什么”</h3>
+      </div>
+      <div class="card-grid">
+        <article v-for="item in staticFacts" :key="item.title" class="page-card module-card">
+          <div class="module-head">
+            <h4>{{ item.title }}</h4>
+          </div>
+          <p class="feature-highlight small">{{ item.value }}</p>
+          <p>{{ item.description }}</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="content-section">
+      <div class="section-head">
+        <p class="section-kicker">外部校验摘要</p>
+        <h3>这里预留给到离港、港口事件或其他外部案例核验</h3>
+      </div>
+      <div class="card-grid">
+        <article v-for="item in validationFacts" :key="item.title" class="page-card module-card">
           <div class="module-head">
             <h4>{{ item.title }}</h4>
           </div>

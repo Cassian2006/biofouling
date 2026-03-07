@@ -32,7 +32,12 @@ def test_vessel_detail_track_and_trend_endpoints_return_real_payloads() -> None:
     report_response = client.get("/api/demo/reports/vessels/268240302")
 
     assert detail_response.status_code == 200
-    assert detail_response.json()["rank_fraction"] == "1 / 52"
+    detail_payload = detail_response.json()
+    assert detail_payload["rank_fraction"] == "1 / 52"
+    assert detail_payload["vessel"]["mean_salinity"] is not None
+    assert detail_payload["vessel"]["mean_current_u"] is not None
+    assert detail_payload["static_profile"]["profile_source"] == "ais_derived"
+    assert detail_payload["validation_summary"]["event_count"] == 0
 
     track_payload = track_response.json()
     assert track_response.status_code == 200

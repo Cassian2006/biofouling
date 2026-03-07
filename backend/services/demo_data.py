@@ -10,17 +10,22 @@ from backend.schemas.demo import (
     RiskCellRecord,
     TopCellSummary,
     TopVesselSummary,
+    ValidationSummary,
     VesselDetailResponse,
     VesselRecord,
+    VesselStaticProfile,
     VesselTrendPoint,
     VesselTrendResponse,
     VesselTrackPoint,
     VesselTrackResponse,
 )
+from scripts.build_vessel_catalog import build_ais_derived_catalog, load_static_profiles, merge_static_profiles
+from scripts.summarize_validation_events import load_validation_events, summarize_validation_events
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
+EXTERNAL_DIR = PROJECT_ROOT / "data" / "external"
 MAPS_DIR = PROJECT_ROOT / "outputs" / "maps"
 REPORTS_DIR = PROJECT_ROOT / "outputs" / "reports"
 
@@ -45,6 +50,13 @@ def _load_ais_csv(path: Path) -> pd.DataFrame:
     if "is_low_speed" in dataframe.columns:
         dataframe["is_low_speed"] = dataframe["is_low_speed"].fillna(False).astype(bool)
     return dataframe
+
+
+def _optional_latest_file(directory: Path, pattern: str) -> Path | None:
+    matches = sorted(directory.glob(pattern))
+    if not matches:
+        return None
+    return matches[-1]
 
 
 def _maybe_round(value: object, digits: int = 3) -> float | None:
@@ -79,6 +91,9 @@ def _serialize_vessels(features: pd.DataFrame) -> list[VesselRecord]:
                 low_speed_ratio=_maybe_round(row.low_speed_ratio),
                 mean_sst=_maybe_round(row.mean_sst),
                 mean_chlorophyll_a=_maybe_round(row.mean_chlorophyll_a),
+                mean_salinity=_maybe_round(getattr(row, "mean_salinity", None)),
+                mean_current_u=_maybe_round(getattr(row, "mean_current_u", None)),
+                mean_current_v=_maybe_round(getattr(row, "mean_current_v", None)),
                 track_duration_hours=_maybe_round(row.track_duration_hours, 2),
                 fpi_proxy=_maybe_round(row.fpi_proxy),
                 ecp_proxy=_maybe_round(row.ecp_proxy),
@@ -146,6 +161,119 @@ def _build_fallback_report_lines(vessel: VesselRecord) -> list[str]:
     ]
 
 
+def _load_vessel_catalog(ais: pd.DataFrame) -> pd.DataFrame:
+    catalog_path = _optional_latest_file(PROCESSED_DIR, "vessel_catalog*.csv")
+    if catalog_path:
+        catalog = _load_csv(catalog_path)
+        catalog["mmsi"] = catalog["mmsi"].astype(str)
+        return catalog
+
+    derived = build_ais_derived_catalog(ais)
+    static_path = _optional_latest_file(EXTERNAL_DIR, "vessel_static*.csv")
+    if static_path:
+        static_profiles = load_static_profiles(static_path)
+        return merge_static_profiles(derived, static_profiles)
+    return derived
+
+
+def _load_validation_summary() -> pd.DataFrame:
+    validation_summary_path = _optional_latest_file(PROCESSED_DIR, "validation_summary*.csv")
+    if validation_summary_path:
+        summary = _load_csv(validation_summary_path)
+        summary["mmsi"] = summary["mmsi"].astype(str)
+        return summary
+
+    validation_events_path = _optional_latest_file(EXTERNAL_DIR, "validation_events*.csv")
+    if validation_events_path:
+        events = load_validation_events(validation_events_path)
+        summary = summarize_validation_events(events)
+        summary["mmsi"] = summary["mmsi"].astype(str)
+        return summary
+
+    return pd.DataFrame(
+        columns=[
+            "mmsi",
+            "event_count",
+            "source_count",
+            "sources",
+            "latest_event_type",
+            "latest_event_start",
+            "latest_port_name",
+            "notes_count",
+        ]
+    )
+
+
+def _find_static_profile(mmsi: str) -> VesselStaticProfile | None:
+    catalog = load_demo_payload()["vessel_catalog"]  # type: ignore[assignment]
+    row = catalog.loc[catalog["mmsi"] == mmsi]
+    if row.empty:
+        return None
+    record = row.iloc[0]
+    build_year = record.get("build_year")
+    return VesselStaticProfile(
+        mmsi=mmsi,
+        first_seen=str(record.get("first_seen")) if pd.notna(record.get("first_seen")) else None,
+        last_seen=str(record.get("last_seen")) if pd.notna(record.get("last_seen")) else None,
+        vessel_name=str(record.get("vessel_name")) if pd.notna(record.get("vessel_name")) else None,
+        imo=str(record.get("imo")) if pd.notna(record.get("imo")) else None,
+        ship_type=str(record.get("ship_type")) if pd.notna(record.get("ship_type")) else None,
+        flag=str(record.get("flag")) if pd.notna(record.get("flag")) else None,
+        build_year=int(build_year) if pd.notna(build_year) else None,
+        length_m=_maybe_round(record.get("length_m")),
+        beam_m=_maybe_round(record.get("beam_m")),
+        design_draught_m=_maybe_round(record.get("design_draught_m")),
+        observed_draught_m=_maybe_round(record.get("observed_draught_m")),
+        max_observed_draught_m=_maybe_round(record.get("max_observed_draught_m")),
+        dwt=_maybe_round(record.get("dwt")),
+        grt=_maybe_round(record.get("grt")),
+        teu=_maybe_round(record.get("teu")),
+        dominant_destination=str(record.get("dominant_destination"))
+        if pd.notna(record.get("dominant_destination"))
+        else None,
+        dominant_nav_status=str(record.get("dominant_nav_status"))
+        if pd.notna(record.get("dominant_nav_status"))
+        else None,
+        profile_source=str(record.get("profile_source") or "ais_derived"),
+        static_source=str(record.get("static_source")) if pd.notna(record.get("static_source")) else None,
+    )
+
+
+def _find_validation_summary(mmsi: str) -> ValidationSummary:
+    summary = load_demo_payload()["validation_summary"]  # type: ignore[assignment]
+    row = summary.loc[summary["mmsi"] == mmsi]
+    if row.empty:
+        return ValidationSummary(
+            mmsi=mmsi,
+            event_count=0,
+            source_count=0,
+            sources=[],
+            latest_event_type=None,
+            latest_event_start=None,
+            latest_port_name=None,
+            notes_count=0,
+        )
+    record = row.iloc[0]
+    sources = str(record.get("sources") or "").split(" | ")
+    sources = [source for source in sources if source]
+    return ValidationSummary(
+        mmsi=mmsi,
+        event_count=int(record.get("event_count") or 0),
+        source_count=int(record.get("source_count") or 0),
+        sources=sources,
+        latest_event_type=str(record.get("latest_event_type"))
+        if pd.notna(record.get("latest_event_type"))
+        else None,
+        latest_event_start=str(record.get("latest_event_start"))
+        if pd.notna(record.get("latest_event_start"))
+        else None,
+        latest_port_name=str(record.get("latest_port_name"))
+        if pd.notna(record.get("latest_port_name"))
+        else None,
+        notes_count=int(record.get("notes_count") or 0),
+    )
+
+
 def _downsample_track(track: pd.DataFrame, max_points: int = 320) -> pd.DataFrame:
     if len(track) <= max_points:
         return track
@@ -168,6 +296,8 @@ def load_demo_payload() -> dict[str, object]:
     features = _load_csv(features_path)
     risk = _load_csv(risk_path)
     ais = _load_ais_csv(ais_path)
+    vessel_catalog = _load_vessel_catalog(ais)
+    validation_summary = _load_validation_summary()
     vessels = _serialize_vessels(features)
     risk_cells = _serialize_risk_cells(risk)
     window_label = _window_label_from_features(features_path)
@@ -180,6 +310,8 @@ def load_demo_payload() -> dict[str, object]:
         "risk_cells": risk_cells,
         "report_text": report_text,
         "ais": ais,
+        "vessel_catalog": vessel_catalog,
+        "validation_summary": validation_summary,
         "summary": DemoSummaryResponse(
             window_label=window_label,
             vessels_summarized=len(vessels),
@@ -235,6 +367,8 @@ def get_vessel_detail(mmsi: str) -> VesselDetailResponse:
         cohort_size=len(vessels),
         rank_fraction=f"{vessel.rank} / {len(vessels)}",
         peer_vessels=peer_vessels,
+        static_profile=_find_static_profile(mmsi),
+        validation_summary=_find_validation_summary(mmsi),
     )
 
 

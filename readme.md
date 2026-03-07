@@ -971,3 +971,31 @@ project/
   - 更完整船舶静态资料与外部校验数据
 
 这意味着 1.0 的数据缺口已经从“环境变量明显不全”缩小为“辅助参考层和校验层未补齐”。
+
+29. 船舶静态资料与外部校验接入第一步（2026-03-07）
+当前已开始执行 1.0 数据补齐中的第二条主线：船舶静态资料与外部校验数据接入。
+
+本轮已完成：
+- 新增船舶静态资料模板：`data/contracts/vessel_static_columns_template.csv`
+- 新增外部校验事件模板：`data/contracts/external_validation_events_template.csv`
+- 新增船舶画像构建脚本：`scripts/build_vessel_catalog.py`
+- 新增外部校验汇总脚本：`scripts/summarize_validation_events.py`
+- 单船详情接口已新增：
+  - `static_profile`
+  - `validation_summary`
+- 单船详情页已新增：
+  - 船舶画像区块
+  - 外部校验摘要区块
+- 上一轮已接入但尚未前端展示的环境扩展字段也已补进单船页：
+  - `mean_salinity`
+  - `mean_current_u`
+  - `mean_current_v`
+
+当前策略：
+- 没有外部静态表时，先由 AIS 自动派生基础船舶画像
+- 有外部静态表时，再自动覆盖和补全船名、IMO、船型、尺度等字段
+- 没有外部校验事件时，单船页仍显示空摘要，不阻塞页面使用
+
+当前意义：
+- 单船页现在不再只解释“它做了什么”，也开始解释“它是什么样的船”以及“是否已有外部事件可用于核验”
+- 这为后续船型分层分析、案例校验和 1.5 阶段更深的分析模块打下了正式数据接口基础

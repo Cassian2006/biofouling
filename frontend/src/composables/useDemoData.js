@@ -69,6 +69,17 @@ function buildVesselDetailFallback(mmsi) {
     cohort_size: vessels.value.length,
     rank_fraction: `${vessel.rank} / ${vessels.value.length}`,
     peer_vessels: vessels.value.filter((item) => item.mmsi !== vessel.mmsi).slice(0, 8),
+    static_profile: null,
+    validation_summary: {
+      mmsi: vessel.mmsi,
+      event_count: 0,
+      source_count: 0,
+      sources: [],
+      latest_event_type: null,
+      latest_event_start: null,
+      latest_port_name: null,
+      notes_count: 0,
+    },
   };
 }
 
