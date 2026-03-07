@@ -363,8 +363,39 @@ def _downsample_track(track: pd.DataFrame, max_points: int = 320) -> pd.DataFram
     return track.iloc[indices].copy()
 
 
-@lru_cache(maxsize=1)
-def load_demo_payload() -> dict[str, object]:
+def _demo_payload_signature() -> tuple[str, ...]:
+    features_path = _latest_file(PROCESSED_DIR, "vessel_features_*.csv")
+    risk_path = _latest_file(MAPS_DIR, "regional_risk_*.csv")
+    report_path = _latest_file(REPORTS_DIR, "voyage_report_*.md")
+    ais_path = _latest_file(PROCESSED_DIR, "ais_*_cleaned.csv")
+
+    signature_items = [
+        features_path,
+        risk_path,
+        report_path,
+        ais_path,
+    ]
+
+    optional_paths = [
+        _optional_latest_file(PROCESSED_DIR, "vessel_catalog*.csv"),
+        _optional_latest_file(PROCESSED_DIR, "validation_summary*.csv"),
+        _optional_latest_file(EXTERNAL_DIR, "vessel_static*.csv"),
+        _optional_latest_file(EXTERNAL_DIR, "validation_events*.csv"),
+        REFERENCE_DIR / "singapore_reference_sites.csv",
+    ]
+
+    for optional_path in optional_paths:
+        if optional_path and optional_path.exists():
+            signature_items.append(optional_path)
+
+    return tuple(
+        f"{path.resolve()}::{path.stat().st_mtime_ns}"
+        for path in signature_items
+    )
+
+
+@lru_cache(maxsize=4)
+def _load_demo_payload_by_signature(signature: tuple[str, ...]) -> dict[str, object]:
     features_path = _latest_file(PROCESSED_DIR, "vessel_features_*.csv")
     risk_path = _latest_file(MAPS_DIR, "regional_risk_*.csv")
     report_path = _latest_file(REPORTS_DIR, "voyage_report_*.md")
@@ -415,6 +446,10 @@ def load_demo_payload() -> dict[str, object]:
         ),
     }
     return payload
+
+
+def load_demo_payload() -> dict[str, object]:
+    return _load_demo_payload_by_signature(_demo_payload_signature())
 
 
 def _find_vessel(mmsi: str) -> VesselRecord:

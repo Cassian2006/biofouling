@@ -15,7 +15,7 @@ def test_tooltip_and_map_components_exist() -> None:
 
     assert "hint-tooltip__bubble" in tooltip
     assert "leaflet" in overview_map.lower()
-    assert "DISPLAY_SUBDIVISIONS = 4" in overview_map
+    assert "DISPLAY_SUBDIVISIONS = 1" in overview_map
     assert "leaflet" in vessel_map.lower()
 
 

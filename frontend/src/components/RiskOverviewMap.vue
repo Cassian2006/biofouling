@@ -34,7 +34,7 @@ const bounds = [
   [0.8, 102.9],
   [1.85, 104.9],
 ];
-const DISPLAY_SUBDIVISIONS = 4;
+const DISPLAY_SUBDIVISIONS = 1;
 
 const cellsByKey = computed(() =>
   new Map(props.cells.map((cell) => [`${cell.grid_lat}-${cell.grid_lon}`, cell])),

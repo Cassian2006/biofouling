@@ -21,8 +21,9 @@ def test_demo_summary_endpoint_returns_real_counts() -> None:
 
     assert response.status_code == 200
     assert payload["vessels_summarized"] == 52
-    assert payload["grid_cells"] == 222
+    assert payload["grid_cells"] == 642
     assert payload["high_risk_cells"] == 1
+    assert payload["medium_risk_cells"] == 31
 
 
 def test_vessel_detail_track_and_trend_endpoints_return_real_payloads() -> None:
@@ -66,14 +67,16 @@ def test_regional_endpoints_return_expected_distribution() -> None:
     cells_payload = cells_response.json()
 
     assert stats_response.status_code == 200
-    assert stats_payload["total_cells"] == 222
-    assert stats_payload["risk_level_counts"] == {"high": 1, "medium": 16, "low": 205}
+    assert stats_payload["total_cells"] == 642
+    assert stats_payload["risk_level_counts"] == {"high": 1, "medium": 31, "low": 610}
     assert len(stats_payload["reference_sites"]) == 8
     assert stats_payload["reference_sites"][0]["site_type"] in {"port", "anchorage"}
 
     assert cells_response.status_code == 200
-    assert len(cells_payload) == 222
-    assert cells_payload[0]["rri_score"] == 0.692
+    assert len(cells_payload) == 642
+    assert cells_payload[0]["grid_lat"] == 1.275
+    assert cells_payload[0]["grid_lon"] == 103.775
+    assert cells_payload[0]["rri_score"] == 0.709
     assert cells_payload[0]["traffic_score"] == 1.0
     assert cells_payload[0]["nearest_reference_name"] is not None
 
