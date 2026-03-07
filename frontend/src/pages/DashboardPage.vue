@@ -14,10 +14,12 @@ const {
   fetchDemoData,
   fetchRegionalStats,
   fetchOverviewReportPreview,
+  fetchAnomalySummary,
 } = useDemoData();
 
 const regionalStats = ref(null);
 const overviewReport = ref(null);
+const anomalySummary = ref(null);
 const activeLayer = ref("rri_score");
 const selectedHotspotKey = ref("");
 
@@ -31,6 +33,8 @@ const layerOptions = [
 const topVessels = computed(() => vessels.value.slice(0, 8));
 const referenceSites = computed(() => regionalStats.value?.reference_sites || []);
 const layerMeta = computed(() => layerOptions.find((item) => item.key === activeLayer.value) || layerOptions[0]);
+const anomalyCounts = computed(() => anomalySummary.value?.anomaly_level_counts || {});
+const topAnomalies = computed(() => anomalySummary.value?.top_anomalies || []);
 
 const sortedCells = computed(() =>
   [...riskCells.value]
@@ -72,11 +76,18 @@ function selectHotspot(keyOrCell) {
   selectedHotspotKey.value = `${keyOrCell.grid_lat}-${keyOrCell.grid_lon}`;
 }
 
+function levelLabel(level) {
+  if (level === "highly_abnormal") return "高度异常";
+  if (level === "suspicious") return "可疑异常";
+  return "正常";
+}
+
 onMounted(async () => {
   try {
     await fetchDemoData();
     regionalStats.value = await fetchRegionalStats();
     overviewReport.value = await fetchOverviewReportPreview();
+    anomalySummary.value = await fetchAnomalySummary();
     if (sortedCells.value.length) {
       selectedHotspotKey.value = `${sortedCells.value[0].grid_lat}-${sortedCells.value[0].grid_lon}`;
     }
@@ -101,7 +112,7 @@ onMounted(async () => {
         <p class="section-kicker">Overview</p>
         <h2>新加坡海峡船舶生物污损风险总览</h2>
         <p class="support-text">
-          平台基于 AIS 航迹与海洋环境数据，对研究区内区域热点、重点船舶与维护优先级进行统一展示。
+          平台基于 AIS 航迹与海洋环境数据，对研究区内空间热点、重点船舶和维护优先级进行统一展示。
         </p>
       </article>
 
@@ -145,9 +156,9 @@ onMounted(async () => {
         <p>建议优先纳入维护评估的船舶数量。</p>
       </article>
       <article class="page-card stat-card">
-        <span class="stat-label">低即时关注</span>
-        <strong class="stat-value">{{ summary.recommendation_counts["Low immediate concern"] || 0 }}</strong>
-        <p>当前暴露压力较低的船舶数量。</p>
+        <span class="stat-label">高度异常船舶</span>
+        <strong class="stat-value">{{ anomalyCounts.highly_abnormal || 0 }}</strong>
+        <p>基于 Autoencoder 暴露模式识别出的异常对象。</p>
       </article>
     </section>
 
@@ -156,7 +167,7 @@ onMounted(async () => {
         <p class="section-kicker">Spatial View</p>
         <h3>
           区域主地图
-          <HintTooltip text="地图基于真实风险格网绘制，显示加密后的展示网格、热点区域与港口/锚地参考点。" />
+          <HintTooltip text="地图基于真实风险格网绘制，展示当前空间风险、热点格网与港口/锚地参考点。" />
         </h3>
       </div>
       <div class="split-grid detail-layout dashboard-map-layout">
@@ -196,7 +207,7 @@ onMounted(async () => {
               <div>
                 <strong>{{ selectedHotspot.grid_lat }}, {{ selectedHotspot.grid_lon }}</strong>
                 <span>
-                  {{ selectedHotspot.risk_level }}风险，{{ selectedHotspot.vessel_count }} 艘船经过，
+                  {{ selectedHotspot.risk_level }} 风险，{{ selectedHotspot.vessel_count }} 艘船经过，
                   最近参考点 {{ selectedHotspot.nearest_reference_name || "暂无" }}
                 </span>
               </div>
@@ -217,7 +228,7 @@ onMounted(async () => {
             <div class="module-head">
               <h4>
                 热点格网列表
-                <HintTooltip text="列表与地图使用相同图层口径，切换图层后排序会同步更新。" />
+                <HintTooltip text="列表与地图使用相同的图层口径，切换图层后排序会同步更新。" />
               </h4>
             </div>
             <button
@@ -230,7 +241,7 @@ onMounted(async () => {
             >
               <div>
                 <strong>{{ item.grid_lat }}, {{ item.grid_lon }}</strong>
-                <span>{{ item.risk_level }}风险，{{ item.vessel_count }} 艘船经过</span>
+                <span>{{ item.risk_level }} 风险，{{ item.vessel_count }} 艘船经过</span>
               </div>
               <div class="list-metric">
                 <div>{{ layerMeta.shortLabel }} {{ item[activeLayer] }}</div>
@@ -239,6 +250,64 @@ onMounted(async () => {
             </button>
           </article>
         </div>
+      </div>
+    </section>
+
+    <section class="content-section">
+      <div class="section-head">
+        <p class="section-kicker">Anomaly</p>
+        <h3>
+          异常暴露筛查
+          <HintTooltip text="基于 Autoencoder 对船舶行为与环境特征进行重建，偏离正常模式越大，异常分数越高。" />
+        </h3>
+      </div>
+      <div class="split-grid detail-layout">
+        <article class="page-card list-card">
+          <div class="module-head">
+            <h4>异常等级分布</h4>
+          </div>
+          <div class="anomaly-chip-row">
+            <div class="anomaly-chip anomaly-chip--alert">
+              <strong>{{ anomalyCounts.highly_abnormal || 0 }}</strong>
+              <span>高度异常</span>
+            </div>
+            <div class="anomaly-chip anomaly-chip--warn">
+              <strong>{{ anomalyCounts.suspicious || 0 }}</strong>
+              <span>可疑异常</span>
+            </div>
+            <div class="anomaly-chip anomaly-chip--calm">
+              <strong>{{ anomalyCounts.normal || 0 }}</strong>
+              <span>正常</span>
+            </div>
+          </div>
+          <p class="support-text anomaly-caption">
+            异常检测用于从同批船舶中快速筛出暴露模式明显偏离常态的对象，辅助总览页优先排查。
+          </p>
+        </article>
+
+        <article class="page-card list-card">
+          <div class="module-head">
+            <h4>
+              异常船舶榜单
+              <HintTooltip text="点击后进入单船页，可继续查看异常解释、轨迹与 FPI 预测结果。" />
+            </h4>
+          </div>
+          <RouterLink
+            v-for="item in topAnomalies"
+            :key="item.mmsi"
+            class="list-row link-row"
+            :to="`/vessels/${item.mmsi}`"
+          >
+            <div>
+              <strong>{{ item.mmsi }}</strong>
+              <span>{{ levelLabel(item.anomaly_level) }} · {{ item.explanations[0] || "异常驱动待补充" }}</span>
+            </div>
+            <div class="list-metric">
+              <div>#{{ item.rank }}</div>
+              <div>Score {{ item.anomaly_score }}</div>
+            </div>
+          </RouterLink>
+        </article>
       </div>
     </section>
 

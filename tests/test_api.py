@@ -32,6 +32,7 @@ def test_vessel_detail_track_and_trend_endpoints_return_real_payloads() -> None:
     track_response = client.get("/api/demo/vessels/268240302/track")
     trend_response = client.get("/api/demo/vessels/268240302/trend")
     forecast_response = client.get("/api/demo/vessels/268240302/forecast")
+    anomaly_response = client.get("/api/demo/vessels/268240302/anomaly")
     report_response = client.get("/api/demo/reports/vessels/268240302")
 
     assert detail_response.status_code == 200
@@ -68,6 +69,13 @@ def test_vessel_detail_track_and_trend_endpoints_return_real_payloads() -> None:
     assert len(forecast_payload["signals"]) >= 1
     assert len(forecast_payload["history_points"]) == 8
 
+    anomaly_payload = anomaly_response.json()
+    assert anomaly_response.status_code == 200
+    assert anomaly_payload["mmsi"] == "268240302"
+    assert anomaly_payload["anomaly_level"] in {"normal", "suspicious", "highly_abnormal"}
+    assert anomaly_payload["anomaly_score"] >= 0
+    assert len(anomaly_payload["peer_anomalies"]) <= 6
+
     assert report_response.status_code == 200
     assert report_response.json()["scope"] == "vessel"
 
@@ -87,9 +95,11 @@ def test_vessel_forecast_endpoint_reports_unavailable_when_history_is_insufficie
 def test_regional_endpoints_return_expected_distribution() -> None:
     stats_response = client.get("/api/demo/regional-stats")
     cells_response = client.get("/api/demo/risk-cells")
+    anomaly_response = client.get("/api/demo/anomalies")
 
     stats_payload = stats_response.json()
     cells_payload = cells_response.json()
+    anomaly_payload = anomaly_response.json()
 
     assert stats_response.status_code == 200
     assert stats_payload["window_label"] == "20260115 to 20260130"
@@ -105,6 +115,15 @@ def test_regional_endpoints_return_expected_distribution() -> None:
     assert cells_payload[0]["rri_score"] == 0.712
     assert cells_payload[0]["traffic_score"] == 1.0
     assert cells_payload[0]["nearest_reference_name"] is not None
+
+    assert anomaly_response.status_code == 200
+    assert anomaly_payload["vessel_count"] == 637
+    assert anomaly_payload["anomaly_level_counts"] == {
+        "highly_abnormal": 32,
+        "suspicious": 96,
+        "normal": 509,
+    }
+    assert anomaly_payload["top_anomalies"][0]["mmsi"] == "563215100"
 
 
 def test_unknown_api_route_returns_404() -> None:

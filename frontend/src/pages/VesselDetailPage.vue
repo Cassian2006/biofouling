@@ -13,22 +13,25 @@ const {
   loading,
   error,
   fetchDemoData,
+  fetchVesselAnomaly,
   fetchVesselDetail,
+  fetchVesselForecast,
   fetchVesselReportPreview,
   fetchVesselTrack,
   fetchVesselTrend,
-  fetchVesselForecast,
 } = useDemoData();
 
 const vesselDetail = ref(null);
 const vesselTrack = ref(null);
 const vesselTrend = ref(null);
 const vesselForecast = ref(null);
+const vesselAnomaly = ref(null);
 const reportPreview = ref(null);
 const pageError = ref("");
 const trackError = ref("");
 const trendError = ref("");
 const forecastError = ref("");
+const anomalyError = ref("");
 const selectedMmsi = ref("");
 
 const selectedVessel = computed(() => vesselDetail.value?.vessel || null);
@@ -39,6 +42,7 @@ const nearestReference = computed(() => vesselDetail.value?.nearest_reference ||
 const forecastSignals = computed(() => vesselForecast.value?.signals || []);
 const forecastHistoryPoints = computed(() => vesselForecast.value?.history_points || []);
 const forecastAvailable = computed(() => Boolean(vesselForecast.value?.available));
+const anomalyPeers = computed(() => vesselAnomaly.value?.peer_anomalies || []);
 
 const vesselOptions = computed(() =>
   vessels.value.map((item) => ({
@@ -55,6 +59,12 @@ function buildAssessment(values, value) {
   if (value <= lower) return "相对较低";
   if (value >= upper) return "相对较高";
   return "中等";
+}
+
+function anomalyLevelLabel(level) {
+  if (level === "highly_abnormal") return "高度异常";
+  if (level === "suspicious") return "可疑异常";
+  return "正常";
 }
 
 const vesselFacts = computed(() => {
@@ -133,7 +143,7 @@ const staticFacts = computed(() => {
     {
       title: "船名 / IMO",
       value: `${staticProfile.value.vessel_name || "暂无"} / ${staticProfile.value.imo || "暂无"}`,
-      description: "后续接入完整外部静态资料后，此处将显示更完整的识别信息。",
+      description: "接入完整外部静态资料后，此处会显示更完整的识别信息。",
     },
     {
       title: "船型 / 船旗",
@@ -184,9 +194,20 @@ const compactSummary = computed(() => {
   const forecastSummary = vesselForecast.value
     ? forecastAvailable.value
       ? `下一时间窗预测 FPI ${vesselForecast.value.predicted_fpi}，预测等级 ${vesselForecast.value.predicted_risk_label}。`
-      : `当前对象暂未生成 LSTM 预测。`
+      : "当前对象暂未生成 LSTM 预测。"
     : "";
-  return `轨迹记录 ${vesselTrack.value.point_count} 点，时间跨度 ${selectedVessel.value.track_duration_hours} 小时，低速暴露比例 ${selectedVessel.value.low_speed_ratio ?? "暂无"}，建议为“${selectedVessel.value.recommendation}”。${forecastSummary}`;
+  const anomalySummary = vesselAnomaly.value
+    ? `异常等级 ${anomalyLevelLabel(vesselAnomaly.value.anomaly_level)}，异常分数 ${vesselAnomaly.value.anomaly_score}。`
+    : "";
+  return `轨迹记录 ${vesselTrack.value.point_count} 点，时间跨度 ${selectedVessel.value.track_duration_hours} 小时，低速暴露比例 ${selectedVessel.value.low_speed_ratio ?? "暂无"}，建议为“${selectedVessel.value.recommendation}”。${forecastSummary}${anomalySummary}`;
+});
+
+const anomalyHeadline = computed(() => {
+  if (!vesselAnomaly.value) return null;
+  return {
+    label: anomalyLevelLabel(vesselAnomaly.value.anomaly_level),
+    percentile: `${Math.round((vesselAnomaly.value.percentile_rank || 0) * 100)}%`,
+  };
 });
 
 const forecastGauge = computed(() => {
@@ -275,7 +296,7 @@ const trendSummary = computed(() => {
   const speedMin = Math.min(...meanSogValues);
   const speedMax = Math.max(...meanSogValues);
   if (allLowSpeed) {
-    return `当前这艘船在所有 ${vesselTrend.value.windows.length} 个分窗内均处于低速状态，因此低速比例曲线会稳定贴近上边界。`;
+    return `当前这艘船在所含 ${vesselTrend.value.windows.length} 个分窗内均处于低速状态，因此低速比例曲线会稳定贴近上边界。`;
   }
   return `当前分窗内平均航速范围 ${speedMin.toFixed(3)} ~ ${speedMax.toFixed(3)} 节，低速比例按动态坐标轴展示。`;
 });
@@ -321,9 +342,7 @@ const svgTrend = computed(() => {
     .join(" ");
 
   const lowSpeedPath = windows
-    .map(
-      (item, index) => `${index === 0 ? "M" : "L"} ${projectX(index).toFixed(2)} ${projectLowSpeedY(item.low_speed_ratio).toFixed(2)}`,
-    )
+    .map((item, index) => `${index === 0 ? "M" : "L"} ${projectX(index).toFixed(2)} ${projectLowSpeedY(item.low_speed_ratio).toFixed(2)}`)
     .join(" ");
 
   const bars = windows.map((item, index) => {
@@ -338,8 +357,6 @@ const svgTrend = computed(() => {
       cx: projectX(index),
       sogY: projectSogY(item.mean_sog),
       lowSpeedY: projectLowSpeedY(item.low_speed_ratio),
-      meanSog: item.mean_sog,
-      lowSpeedRatio: item.low_speed_ratio,
     };
   });
 
@@ -363,8 +380,6 @@ const svgTrend = computed(() => {
     ratioAxis,
     paddingLeft,
     paddingRight,
-    topPadding,
-    bottomPadding,
   };
 });
 
@@ -379,9 +394,11 @@ async function loadPageData() {
   trackError.value = "";
   trendError.value = "";
   forecastError.value = "";
+  anomalyError.value = "";
   vesselTrack.value = null;
   vesselTrend.value = null;
   vesselForecast.value = null;
+  vesselAnomaly.value = null;
 
   try {
     await fetchDemoData();
@@ -409,8 +426,13 @@ async function loadPageData() {
     try {
       vesselForecast.value = await fetchVesselForecast(mmsi);
     } catch (forecastLoadError) {
-      forecastError.value =
-        forecastLoadError instanceof Error ? forecastLoadError.message : "预测数据加载失败";
+      forecastError.value = forecastLoadError instanceof Error ? forecastLoadError.message : "预测数据加载失败";
+    }
+
+    try {
+      vesselAnomaly.value = await fetchVesselAnomaly(mmsi);
+    } catch (anomalyLoadError) {
+      anomalyError.value = anomalyLoadError instanceof Error ? anomalyLoadError.message : "异常检测数据加载失败";
     }
   } catch (errorObject) {
     pageError.value = errorObject instanceof Error ? errorObject.message : "单船详情加载失败";
@@ -454,7 +476,7 @@ watch(
         <p class="section-kicker">Vessel Detail</p>
         <h2>单船暴露诊断与 AIS 轨迹判读</h2>
         <p class="support-text">
-          页面集中展示单船轨迹、时间趋势、环境暴露、船舶画像与校验摘要，用于支持对象级风险判读。
+          页面集中展示单船轨迹、时间趋势、环境暴露、船舶画像、异常解释与短期预测，用于支持对象级风险判断。
         </p>
       </article>
 
@@ -480,10 +502,77 @@ watch(
 
     <section class="content-section">
       <div class="section-head">
+        <p class="section-kicker">Anomaly</p>
+        <h3>
+          异常暴露解释
+          <HintTooltip text="异常检测基于 Autoencoder 重建误差，判断该船的行为与环境暴露模式是否显著偏离同批对象。" />
+        </h3>
+      </div>
+      <div class="split-grid detail-layout">
+        <article class="page-card list-card">
+          <div class="module-head">
+            <h4>异常概览</h4>
+            <span v-if="anomalyHeadline" class="status-pill">{{ anomalyHeadline.label }}</span>
+          </div>
+          <div v-if="vesselAnomaly" class="anomaly-overview-grid">
+            <div class="summary-metric">
+              <span>异常分数</span>
+              <strong>{{ vesselAnomaly.anomaly_score }}</strong>
+            </div>
+            <div class="summary-metric">
+              <span>分位位置</span>
+              <strong>前 {{ anomalyHeadline?.percentile }}</strong>
+            </div>
+          </div>
+          <div v-if="vesselAnomaly?.explanations?.length" class="signal-chip-list">
+            <div v-for="item in vesselAnomaly.explanations" :key="item" class="signal-chip">
+              <strong>异常驱动</strong>
+              <span>{{ item }}</span>
+            </div>
+          </div>
+          <div v-else class="list-row">
+            <div>
+              <strong>异常说明</strong>
+              <span>{{ anomalyError || "当前没有可展示的异常解释。" }}</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="page-card list-card">
+          <div class="module-head">
+            <h4>相邻异常对象</h4>
+          </div>
+          <RouterLink
+            v-for="item in anomalyPeers"
+            :key="item.mmsi"
+            class="list-row link-row"
+            :to="`/vessels/${item.mmsi}`"
+          >
+            <div>
+              <strong>{{ item.mmsi }}</strong>
+              <span>{{ anomalyLevelLabel(item.anomaly_level) }} · {{ item.explanations[0] || "异常驱动待补充" }}</span>
+            </div>
+            <div class="list-metric">
+              <div>#{{ item.rank }}</div>
+              <div>Score {{ item.anomaly_score }}</div>
+            </div>
+          </RouterLink>
+          <div v-if="!anomalyPeers.length" class="list-row">
+            <div>
+              <strong>异常邻近榜单</strong>
+              <span>{{ anomalyError || "当前没有可展示的对比对象。" }}</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="content-section">
+      <div class="section-head">
         <p class="section-kicker">Forecast</p>
         <h3>
           下一时间窗 FPI 预测
-          <HintTooltip text="预测基于最近 8 个 6 小时窗口的 AIS 行为序列与环境暴露序列，由当前最佳 LSTM 模型输出。页面展示的是校准后的风险等级口径。" />
+          <HintTooltip text="预测基于最近 8 个 6 小时窗口的 AIS 行为序列与环境暴露序列，由当前最优 LSTM 模型输出。" />
         </h3>
       </div>
       <div class="split-grid detail-layout">
@@ -502,7 +591,7 @@ watch(
             <div class="forecast-meta-grid">
               <div class="summary-metric">
                 <span>预测窗口</span>
-                <strong>{{ vesselForecast.forecast_window_start }} → {{ vesselForecast.forecast_window_end }}</strong>
+                <strong>{{ vesselForecast.forecast_window_start }} -> {{ vesselForecast.forecast_window_end }}</strong>
               </div>
               <div class="summary-metric">
                 <span>预测区间</span>
@@ -602,7 +691,7 @@ watch(
           <div v-if="vesselForecast && forecastAvailable" class="list-row">
             <div>
               <strong>等级校准</strong>
-              <span>校准阈值为 low / medium {{ vesselForecast.low_threshold }}，medium / high {{ vesselForecast.high_threshold }}，用于改善前端标签判读。</span>
+              <span>校准阈值为 low / medium {{ vesselForecast.low_threshold }}，medium / high {{ vesselForecast.high_threshold }}。</span>
             </div>
           </div>
           <div v-if="vesselForecast && forecastAvailable" class="signal-chip-list">
@@ -633,7 +722,7 @@ watch(
         <p class="section-kicker">Track Map</p>
         <h3>
           AIS 轨迹地图
-          <HintTooltip text="轨迹基于真实 AIS 点绘制，起点、终点、低速点与最近港口/锚地参考点已叠加到同一底图上。" />
+          <HintTooltip text="轨迹基于真实 AIS 点绘制，起点、终点、低速点与最近港口/锚地参考点叠加在同一底图中。" />
         </h3>
       </div>
       <div class="split-grid detail-layout">

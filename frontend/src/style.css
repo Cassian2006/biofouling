@@ -1019,6 +1019,59 @@ img {
   line-height: 1.5;
 }
 
+.anomaly-chip-row,
+.anomaly-overview-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.anomaly-chip-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.anomaly-overview-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.anomaly-chip {
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.anomaly-chip strong,
+.anomaly-chip span {
+  display: block;
+}
+
+.anomaly-chip strong {
+  font-size: 28px;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.anomaly-chip span {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.anomaly-chip--alert {
+  background: rgba(185, 28, 28, 0.08);
+}
+
+.anomaly-chip--warn {
+  background: rgba(202, 138, 4, 0.1);
+}
+
+.anomaly-chip--calm {
+  background: rgba(15, 118, 110, 0.08);
+}
+
+.anomaly-caption {
+  margin: 0;
+}
+
 .image-card img {
   border-radius: 16px;
 }
@@ -1049,7 +1102,9 @@ img {
   }
 
   .forecast-score-row,
-  .forecast-meta-grid {
+  .forecast-meta-grid,
+  .anomaly-chip-row,
+  .anomaly-overview-grid {
     grid-template-columns: 1fr;
   }
 

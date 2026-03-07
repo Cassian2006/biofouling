@@ -11,6 +11,8 @@ from backend.schemas.demo import (
     RegionalStatsResponse,
     ReportPreviewResponse,
     RiskCellRecord,
+    VesselAnomalyDetailResponse,
+    VesselAnomalyResponse,
     VesselDetailResponse,
     VesselForecastResponse,
     VesselRecord,
@@ -30,6 +32,7 @@ from backend.services.demo_data import (
     get_vessel_trend,
     get_vessel_track,
 )
+from backend.services.anomaly_data import get_demo_anomaly_summary, get_vessel_anomaly_detail
 from backend.services.forecast_data import get_vessel_forecast
 from backend.services.scoring import estimate_scores
 
@@ -132,6 +135,24 @@ def demo_vessel_forecast(mmsi: str) -> VesselForecastResponse:
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except (FileNotFoundError, RuntimeError) as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@app.get("/api/demo/anomalies", tags=["demo"], response_model=VesselAnomalyResponse)
+def demo_anomalies() -> VesselAnomalyResponse:
+    try:
+        return get_demo_anomaly_summary()
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@app.get("/api/demo/vessels/{mmsi}/anomaly", tags=["demo"], response_model=VesselAnomalyDetailResponse)
+def demo_vessel_anomaly(mmsi: str) -> VesselAnomalyDetailResponse:
+    try:
+        return get_vessel_anomaly_detail(mmsi)
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except FileNotFoundError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
 
 

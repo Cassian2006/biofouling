@@ -204,6 +204,31 @@ class VesselForecastResponse(BaseModel):
     history_points: list[ForecastHistoryPoint]
 
 
+class VesselAnomalyRecord(BaseModel):
+    rank: int
+    mmsi: str
+    anomaly_score: float
+    anomaly_level: str
+    explanations: list[str]
+
+
+class VesselAnomalyResponse(BaseModel):
+    window_label: str
+    vessel_count: int
+    anomaly_level_counts: dict[str, int]
+    top_anomalies: list[VesselAnomalyRecord]
+
+
+class VesselAnomalyDetailResponse(BaseModel):
+    window_label: str
+    mmsi: str
+    anomaly_score: float
+    anomaly_level: str
+    percentile_rank: float
+    explanations: list[str]
+    peer_anomalies: list[VesselAnomalyRecord]
+
+
 class RegionalStatsResponse(BaseModel):
     window_label: str
     total_cells: int

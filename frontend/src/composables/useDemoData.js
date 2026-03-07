@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 const summary = ref(null);
 const vessels = ref([]);
 const riskCells = ref([]);
+const anomalySummary = ref(null);
 const loading = ref(false);
 const error = ref("");
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
@@ -199,6 +200,71 @@ async function fetchOverviewReportPreview() {
   }
 }
 
+function buildAnomalySummaryFallback() {
+  const ranked = [...vessels.value]
+    .filter((item) => item.fpi_proxy !== null && item.fpi_proxy !== undefined)
+    .sort((left, right) => (right.fpi_proxy || 0) - (left.fpi_proxy || 0));
+  return {
+    window_label: summary.value?.window_label || "",
+    vessel_count: vessels.value.length,
+    anomaly_level_counts: {
+      highly_abnormal: Math.min(6, ranked.length),
+      suspicious: Math.min(12, Math.max(ranked.length - 6, 0)),
+      normal: Math.max(vessels.value.length - 18, 0),
+    },
+    top_anomalies: ranked.slice(0, 12).map((item, index) => ({
+      rank: index + 1,
+      mmsi: item.mmsi,
+      anomaly_score: item.fpi_proxy,
+      anomaly_level: index < 6 ? "highly_abnormal" : "suspicious",
+      explanations: ["当前回退为静态演示数据，异常解释未接入。"],
+    })),
+  };
+}
+
+async function fetchAnomalySummary() {
+  await fetchDemoData();
+  try {
+    const payload = await fetchJson(buildApiUrl("/api/demo/anomalies"));
+    anomalySummary.value = payload;
+    return payload;
+  } catch (errorObject) {
+    const fallback = buildAnomalySummaryFallback();
+    anomalySummary.value = fallback;
+    return fallback;
+  }
+}
+
+async function fetchVesselAnomaly(mmsi) {
+  await fetchDemoData();
+  try {
+    return await fetchJson(buildApiUrl(`/api/demo/vessels/${mmsi}/anomaly`));
+  } catch (errorObject) {
+    const fallbackSummary = anomalySummary.value || buildAnomalySummaryFallback();
+    const match = fallbackSummary.top_anomalies.find((item) => item.mmsi === String(mmsi));
+    if (match) {
+      return {
+        window_label: fallbackSummary.window_label,
+        mmsi: String(mmsi),
+        anomaly_score: match.anomaly_score,
+        anomaly_level: match.anomaly_level,
+        percentile_rank: Number((1 - (match.rank - 1) / Math.max(fallbackSummary.vessel_count - 1, 1)).toFixed(4)),
+        explanations: match.explanations,
+        peer_anomalies: fallbackSummary.top_anomalies.filter((item) => item.mmsi !== String(mmsi)).slice(0, 6),
+      };
+    }
+    return {
+      window_label: fallbackSummary.window_label,
+      mmsi: String(mmsi),
+      anomaly_score: 0,
+      anomaly_level: "normal",
+      percentile_rank: 0.5,
+      explanations: ["当前没有可用的异常检测结果。"],
+      peer_anomalies: fallbackSummary.top_anomalies.slice(0, 6),
+    };
+  }
+}
+
 export function useDemoData() {
   const hasData = computed(() => Boolean(summary.value));
 
@@ -206,6 +272,7 @@ export function useDemoData() {
     summary,
     vessels,
     riskCells,
+    anomalySummary,
     loading,
     error,
     hasData,
@@ -217,5 +284,7 @@ export function useDemoData() {
     fetchRegionalStats,
     fetchVesselReportPreview,
     fetchOverviewReportPreview,
+    fetchAnomalySummary,
+    fetchVesselAnomaly,
   };
 }
