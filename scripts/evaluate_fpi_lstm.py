@@ -150,7 +150,7 @@ def main() -> None:
     model_path = Path(args.model_dir) / "model.pt"
     training_metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
 
-    torch, nn, _, _ = require_torch()
+    torch, nn, _, _, _ = require_torch()
     dataframe, features, targets, _ = load_dataset(Path(args.dataset))
     _, _, val_x, val_y = split_by_vessel(dataframe, features, targets)
     try:

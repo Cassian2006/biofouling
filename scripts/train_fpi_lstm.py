@@ -17,12 +17,12 @@ def require_torch():
     try:
         import torch
         from torch import nn
-        from torch.utils.data import DataLoader, TensorDataset
+        from torch.utils.data import DataLoader, TensorDataset, WeightedRandomSampler
     except ImportError as exc:  # pragma: no cover - depends on optional dependency
         raise RuntimeError(
             "PyTorch is required for LSTM training. Install it separately before running this script."
         ) from exc
-    return torch, nn, DataLoader, TensorDataset
+    return torch, nn, DataLoader, TensorDataset, WeightedRandomSampler
 
 
 def parse_args() -> argparse.Namespace:
@@ -38,6 +38,30 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=12, help="Training epochs.")
     parser.add_argument("--batch-size", type=int, default=32, help="Training batch size.")
     parser.add_argument("--learning-rate", type=float, default=1e-3, help="Learning rate.")
+    parser.add_argument(
+        "--sampling-strategy",
+        choices=["uniform", "balanced"],
+        default="balanced",
+        help="How to sample training rows across risk labels.",
+    )
+    parser.add_argument(
+        "--loss-weighting",
+        choices=["uniform", "balanced"],
+        default="balanced",
+        help="How to weight regression loss across risk labels.",
+    )
+    parser.add_argument(
+        "--sampling-balance-power",
+        type=float,
+        default=1.0,
+        help="Power applied to balanced sampling weights. Lower than 1.0 makes balancing milder.",
+    )
+    parser.add_argument(
+        "--loss-balance-power",
+        type=float,
+        default=1.0,
+        help="Power applied to balanced loss weights. Lower than 1.0 makes weighting milder.",
+    )
     return parser.parse_args()
 
 
@@ -96,12 +120,43 @@ def risk_labels_from_targets(targets: np.ndarray) -> list[str]:
     return [assign_risk_label(float(value)) for value in targets.tolist()]
 
 
+def compute_label_weights(
+    labels: list[str], mode: str = "balanced", power: float = 1.0
+) -> dict[str, float]:
+    unique_labels = sorted(set(labels))
+    if mode == "uniform":
+        return {label: 1.0 for label in unique_labels}
+
+    counts = pd.Series(labels).value_counts()
+    total = float(sum(counts.values))
+    class_count = float(len(counts))
+    weights = {
+        label: (total / (class_count * float(counts[label]))) ** power for label in counts.index
+    }
+    return {label: float(weights.get(label, 1.0)) for label in unique_labels}
+
+
+def sample_weight_array(labels: list[str], weight_map: dict[str, float]) -> np.ndarray:
+    return np.array([weight_map.get(label, 1.0) for label in labels], dtype=np.float32)
+
+
 def main() -> None:
     args = parse_args()
-    torch, nn, DataLoader, TensorDataset = require_torch()
+    torch, nn, DataLoader, TensorDataset, WeightedRandomSampler = require_torch()
 
     dataframe, features, targets, feature_columns = load_dataset(Path(args.dataset))
     train_x, train_y, val_x, val_y = split_by_vessel(dataframe, features, targets)
+    train_labels = risk_labels_from_targets(train_y)
+    train_weight_map = compute_label_weights(
+        train_labels, mode=args.sampling_strategy, power=args.sampling_balance_power
+    )
+    loss_weight_map = compute_label_weights(
+        train_labels, mode=args.loss_weighting, power=args.loss_balance_power
+    )
+    train_sample_weights = sample_weight_array(train_labels, train_weight_map)
+    train_loss_weights = torch.tensor(
+        sample_weight_array(train_labels, loss_weight_map), dtype=torch.float32
+    )
     model = LSTMForecaster.build(
         nn,
         input_size=train_x.shape[2],
@@ -109,24 +164,40 @@ def main() -> None:
         layers=args.layers,
     )
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
-    loss_fn = nn.MSELoss()
 
-    train_loader = DataLoader(
-        TensorDataset(torch.tensor(train_x), torch.tensor(train_y)),
-        batch_size=args.batch_size,
-        shuffle=True,
+    train_dataset = TensorDataset(
+        torch.tensor(train_x),
+        torch.tensor(train_y),
+        train_loss_weights,
     )
+    if args.sampling_strategy == "balanced":
+        sampler = WeightedRandomSampler(
+            weights=torch.tensor(train_sample_weights, dtype=torch.float32),
+            num_samples=len(train_sample_weights),
+            replacement=True,
+        )
+        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, sampler=sampler)
+    else:
+        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+
     val_inputs = torch.tensor(val_x)
     val_targets = torch.tensor(val_y)
 
     history: list[dict[str, float]] = []
+    best_val_loss = float("inf")
+    best_state_dict = None
+    best_epoch = None
     for epoch in range(1, args.epochs + 1):
         model.train()
         running_loss = 0.0
-        for batch_inputs, batch_targets in train_loader:
+        for batch_inputs, batch_targets, batch_weights in train_loader:
             optimizer.zero_grad()
             predictions = model(batch_inputs)
-            loss = loss_fn(predictions, batch_targets)
+            per_item_loss = torch.square(predictions - batch_targets)
+            if args.loss_weighting == "balanced":
+                loss = (per_item_loss * batch_weights).mean()
+            else:
+                loss = per_item_loss.mean()
             loss.backward()
             optimizer.step()
             running_loss += float(loss.item()) * len(batch_inputs)
@@ -134,7 +205,7 @@ def main() -> None:
         model.eval()
         with torch.no_grad():
             val_predictions = model(val_inputs)
-            val_loss = float(loss_fn(val_predictions, val_targets).item())
+            val_loss = float(torch.mean(torch.square(val_predictions - val_targets)).item())
 
         epoch_record = {
             "epoch": epoch,
@@ -143,10 +214,20 @@ def main() -> None:
         }
         history.append(epoch_record)
         print(epoch_record)
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            best_epoch = epoch
+            best_state_dict = {
+                key: value.detach().cpu().clone() for key, value in model.state_dict().items()
+            }
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    torch.save(model.state_dict(), output_dir / "model.pt")
+    if best_state_dict is None:
+        best_state_dict = {key: value.detach().cpu() for key, value in model.state_dict().items()}
+        best_epoch = args.epochs
+        best_val_loss = history[-1]["val_loss"]
+    torch.save(best_state_dict, output_dir / "model.pt")
     metrics = {
         "rows": int(len(dataframe)),
         "train_rows": int(len(train_x)),
@@ -158,6 +239,13 @@ def main() -> None:
         "hidden_size": int(args.hidden_size),
         "layers": int(args.layers),
         "label_set": sorted(set(risk_labels_from_targets(targets))),
+        "sampling_strategy": args.sampling_strategy,
+        "loss_weighting": args.loss_weighting,
+        "sampling_balance_power": float(args.sampling_balance_power),
+        "loss_balance_power": float(args.loss_balance_power),
+        "label_weights": loss_weight_map,
+        "best_epoch": int(best_epoch),
+        "best_val_loss": float(best_val_loss),
         "history": history,
     }
     (output_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
