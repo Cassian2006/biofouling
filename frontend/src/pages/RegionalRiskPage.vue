@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import InfoDisclosure from "../components/InfoDisclosure.vue";
 import { useDemoData } from "../composables/useDemoData";
 
 const route = useRoute();
@@ -17,25 +18,25 @@ const layerOptions = [
     key: "rri_score",
     title: "综合风险层",
     shortLabel: "RRI",
-    description: "把交通、低速和环境三个维度综合后的总风险，用来判断哪里最值得优先关注。",
+    description: "综合交通、低速与环境三类信号后的总体风险，用于识别优先关注区域。",
   },
   {
     key: "traffic_score",
     title: "交通暴露层",
     shortLabel: "交通",
-    description: "看哪里通过的轨迹点最多、交通压力最大，更适合解释拥挤和频繁经过的区域。",
+    description: "用于观察轨迹点最密集、通行压力最大的区域。",
   },
   {
     key: "low_speed_score",
     title: "低速暴露层",
     shortLabel: "低速",
-    description: "看哪里低速与停留行为更集中，更适合解释等待、慢速机动和暴露积累。",
+    description: "用于识别低速、等待或停留行为更集中的区域。",
   },
   {
     key: "environment_score",
     title: "环境暴露层",
     shortLabel: "环境",
-    description: "看哪里环境条件对污损更友好，更适合解释为什么某些区域天然更敏感。",
+    description: "用于观察环境条件对污损积累更敏感的区域。",
   },
 ];
 
@@ -72,12 +73,12 @@ const layerSummaryCards = computed(() => {
     {
       title: "图层平均值",
       value: averageValue ?? "暂无",
-      description: "表示整个研究区在当前图层上的平均压力水平。",
+      description: "表示整个研究区在该图层上的总体压力水平。",
     },
     {
       title: "高值格网数量",
       value: activeCells,
-      description: "当前用 0.5 作为展示阈值，帮助快速识别明显偏高的区域。",
+      description: "当前以 0.5 作为展示阈值，用于快速识别明显偏高区域。",
     },
     {
       title: "当前热点格网",
@@ -94,24 +95,24 @@ const hotspotFactors = computed(() => {
     {
       title: "交通暴露分值",
       value: cell.traffic_score,
-      description: "表示该格网内轨迹点密度对区域风险的贡献。",
+      description: "表示该格网内轨迹点密度对风险的贡献。",
     },
     {
       title: "低速暴露分值",
       value: cell.low_speed_score,
-      description: "表示该格网内低速、停留或缓行行为的累积程度。",
+      description: "表示该格网内低速与停留行为的积累程度。",
     },
     {
       title: "环境暴露分值",
       value: cell.environment_score,
-      description: "表示该格网在环境条件上对污损积累的潜在促进作用。",
+      description: "表示该格网环境条件对污损压力的促进程度。",
     },
     {
       title: "最近参考点",
       value: cell.nearest_reference_name || "暂无",
       description: cell.nearest_reference_name
-        ? `当前距离约 ${cell.nearest_reference_distance_km ?? "暂无"} km，类型为 ${cell.nearest_reference_type || "未知"}。`
-        : "当前还没有匹配到港口或锚地参考点。",
+        ? `距离约 ${cell.nearest_reference_distance_km ?? "暂无"} km，类型为 ${cell.nearest_reference_type || "未知"}。`
+        : "当前没有匹配到港口或锚地参考点。",
     },
   ];
 });
@@ -127,12 +128,12 @@ const hotspotExplanation = computed(() => {
   ].sort((left, right) => right.value - left.value);
 
   return [
-    `当前图层关注的是“${layerMeta.value.title}”，所以榜单和颜色优先按 ${layerMeta.value.shortLabel} 排序。`,
-    `这个热点格网的综合风险值为 ${cell.rri_score}，共有 ${cell.vessel_count} 艘船经过，累计 ${cell.traffic_points} 个轨迹点。`,
-    `如果拆成三个构成项，当前最强的驱动因素是 ${factors[0].title}，其次是 ${factors[1].title}。`,
+    `当前正在查看“${layerMeta.value.title}”，热点榜单会优先按照该图层排序。`,
+    `该热点格网的综合风险值为 ${cell.rri_score}，共有 ${cell.vessel_count} 艘船经过，累计 ${cell.traffic_points} 个轨迹点。`,
+    `从分值构成看，当前最主要的驱动因素是 ${factors[0].title}，其次是 ${factors[1].title}。`,
     cell.nearest_reference_name
-      ? `从地理语义上看，它离 ${cell.nearest_reference_name} 更近，距离约 ${cell.nearest_reference_distance_km} km，可作为近港或锚地解释的参考。`
-      : "当前还没有近港或锚地参考匹配，因此这一轮解释仍以格网行为与环境信号为主。",
+      ? `从地理语义上看，它更接近 ${cell.nearest_reference_name}，距离约 ${cell.nearest_reference_distance_km} km，可作为近港或锚地解释的参考。`
+      : "当前没有近港或锚地参考匹配，因此本轮解释以格网行为与环境信号为主。",
   ];
 });
 
@@ -233,7 +234,7 @@ watch([activeLayer, selectedHotspotKey], () => {
 
 <template>
   <section v-if="(loading && !regionalStats) || (!regionalStats && !pageError && !error)" class="page-card empty-state">
-    正在加载区域风险页...
+    正在加载区域风险页面...
   </section>
 
   <section v-else-if="pageError || (error && !regionalStats)" class="page-card empty-state error-state">
@@ -243,10 +244,10 @@ watch([activeLayer, selectedHotspotKey], () => {
   <template v-else-if="summary && regionalStats">
     <section class="hero-grid">
       <article class="page-card hero-copy-card">
-        <p class="section-kicker">区域风险页</p>
-        <h2>这一页现在不仅能切换风险图层，还能告诉你热点更靠近哪个港口或锚地。</h2>
+        <p class="section-kicker">Regional Risk</p>
+        <h2>用统一的区域视角查看热点位置、主要驱动因素与近港语义解释。</h2>
         <p class="support-text">
-          区域页要回答三个问题：哪里最值得关注、热点主要由什么驱动、它更像是近港风险还是锚地风险。
+          本页用于回答三个问题：哪里最值得关注、热点由什么驱动、它更接近港口还是锚地。
         </p>
       </article>
 
@@ -270,10 +271,25 @@ watch([activeLayer, selectedHotspotKey], () => {
       </article>
     </section>
 
+    <InfoDisclosure
+      title="页面说明"
+      summary="区域页优先强调热点解释与图层对比，说明文字已统一折叠收纳。"
+    >
+      <p>
+        本页不只是展示“哪里高风险”，更强调“为什么高风险”以及“换一个图层视角后会发生什么变化”。
+      </p>
+      <p>
+        图层切换用于区分综合风险、交通暴露、低速暴露与环境暴露。热点解释与榜单会随当前图层实时改变。
+      </p>
+      <p>
+        港口与锚地参考层用于补充地理语义，让热点不再只是经纬度坐标，而是与近港环境建立联系。
+      </p>
+    </InfoDisclosure>
+
     <section class="content-section">
       <div class="section-head">
-        <p class="section-kicker">图层切换</p>
-        <h3>先决定你现在想看的是哪一种风险解释维度</h3>
+        <p class="section-kicker">Layers</p>
+        <h3>图层切换</h3>
       </div>
       <article class="page-card layer-switch-card">
         <button
@@ -292,8 +308,8 @@ watch([activeLayer, selectedHotspotKey], () => {
 
     <section class="content-section">
       <div class="section-head">
-        <p class="section-kicker">图层预览</p>
-        <h3>先用格网矩阵看清当前图层在整个研究区里的分布</h3>
+        <p class="section-kicker">Matrix</p>
+        <h3>格网矩阵预览</h3>
       </div>
       <div class="split-grid detail-layout">
         <article class="page-card regional-grid-card">
@@ -301,9 +317,6 @@ watch([activeLayer, selectedHotspotKey], () => {
             <h4>{{ layerMeta.title }}</h4>
             <span class="status-pill">真实格网</span>
           </div>
-          <p class="support-text">
-            这张矩阵图不替代地图，它的作用是在切换图层时，更稳定地看见不同格网的高低变化。
-          </p>
           <div v-if="svgGrid" class="regional-grid-stage">
             <svg :viewBox="`0 0 ${svgGrid.width} ${svgGrid.height}`" class="regional-grid-svg" role="img" aria-label="区域图层矩阵图">
               <rect x="0" y="0" :width="svgGrid.width" :height="svgGrid.height" rx="18" class="trend-bg" />
@@ -323,36 +336,21 @@ watch([activeLayer, selectedHotspotKey], () => {
           </div>
         </article>
 
-        <article class="page-card list-card">
-          <div class="module-head">
-            <h4>如何理解当前图层</h4>
-          </div>
-          <div class="list-row">
-            <div>
-              <strong>当前图层</strong>
-              <span>{{ layerMeta.description }}</span>
-            </div>
-          </div>
-          <div class="list-row">
-            <div>
-              <strong>矩阵图的意义</strong>
-              <span>它把地图中的格网结构抽出来，专门帮助你比较不同图层下的高值区域变化。</span>
-            </div>
-          </div>
-          <div class="list-row">
-            <div>
-              <strong>加入参考层之后</strong>
-              <span>热点现在不只停留在经纬度层面，还能看到它离哪个港口或锚地更近。</span>
-            </div>
-          </div>
-        </article>
+        <InfoDisclosure
+          title="图层判读说明"
+          summary="矩阵图不替代地图，它的作用是让不同图层下的高值区域变化更稳定、直观。"
+        >
+          <p>当前图层：{{ layerMeta.description }}</p>
+          <p>矩阵图将地图中的格网结构抽离出来，更适合横向比较不同图层下的高值格网变化。</p>
+          <p>加入参考层后，热点解释不仅停留在坐标层面，也能说明其更接近哪个港口或锚地。</p>
+        </InfoDisclosure>
       </div>
     </section>
 
     <section class="content-section">
       <div class="section-head">
-        <p class="section-kicker">当前图层摘要</p>
-        <h3>把当前维度下最关键的四个量先提出来</h3>
+        <p class="section-kicker">Summary</p>
+        <h3>当前图层摘要</h3>
       </div>
       <div class="card-grid">
         <article v-for="item in layerSummaryCards" :key="item.title" class="page-card module-card">
@@ -367,8 +365,8 @@ watch([activeLayer, selectedHotspotKey], () => {
 
     <section class="content-section">
       <div class="section-head">
-        <p class="section-kicker">热点解释</p>
-        <h3>先拆开看当前热点格网为什么会排到前面</h3>
+        <p class="section-kicker">Hotspot</p>
+        <h3>热点解释</h3>
       </div>
       <div class="split-grid detail-layout">
         <article class="page-card text-card">
@@ -381,9 +379,7 @@ watch([activeLayer, selectedHotspotKey], () => {
           <div class="list-row">
             <div>
               <strong>{{ selectedHotspot?.grid_lat }}, {{ selectedHotspot?.grid_lon }}</strong>
-              <span>
-                {{ selectedHotspot?.risk_level }} 风险，{{ selectedHotspot?.vessel_count }} 艘船经过
-              </span>
+              <span>{{ selectedHotspot?.risk_level }}风险，{{ selectedHotspot?.vessel_count }} 艘船经过</span>
             </div>
             <div class="list-metric">
               <div>{{ layerMeta.shortLabel }} {{ selectedHotspot?.[activeLayer] }}</div>
@@ -405,8 +401,8 @@ watch([activeLayer, selectedHotspotKey], () => {
 
     <section class="content-section">
       <div class="section-head">
-        <p class="section-kicker">热点格网榜单</p>
-        <h3>这里按当前选中的图层重新排序，不再只看综合风险</h3>
+        <p class="section-kicker">Ranking</p>
+        <h3>热点格网榜单</h3>
       </div>
       <article class="page-card list-card">
         <button
@@ -420,8 +416,7 @@ watch([activeLayer, selectedHotspotKey], () => {
           <div>
             <strong>{{ item.grid_lat }}, {{ item.grid_lon }}</strong>
             <span>
-              {{ item.risk_level }} 风险，{{ item.vessel_count }} 艘船经过，
-              最近参考点为 {{ item.nearest_reference_name || "暂无" }}
+              {{ item.risk_level }}风险，{{ item.vessel_count }} 艘船经过，最近参考点为 {{ item.nearest_reference_name || "暂无" }}
             </span>
           </div>
           <div class="list-metric">
@@ -434,8 +429,8 @@ watch([activeLayer, selectedHotspotKey], () => {
 
     <section class="content-section">
       <div class="section-head">
-        <p class="section-kicker">参考层名录</p>
-        <h3>当前先用轻量港口与锚地点位帮助解释地理语义</h3>
+        <p class="section-kicker">Reference</p>
+        <h3>参考点名录</h3>
       </div>
       <div class="card-grid">
         <article v-for="site in referenceSites" :key="site.site_id" class="page-card module-card">
@@ -451,14 +446,17 @@ watch([activeLayer, selectedHotspotKey], () => {
 
     <section class="content-section">
       <div class="section-head">
-        <p class="section-kicker">地图参考</p>
-        <h3>地图仍然保留，帮助对照真实地理位置</h3>
+        <p class="section-kicker">Map</p>
+        <h3>区域地图参考</h3>
       </div>
-      <article class="page-card text-card">
+      <InfoDisclosure
+        title="地图说明"
+        summary="地图用于回到真实海域语境，矩阵图用于稳定比较图层，两者分工不同。"
+      >
         <p>
-          这里保留原始区域地图，是为了帮助把格网热点和真实海域位置对应起来。矩阵图负责比较图层，地图负责回到地理语境，两者并不冲突。
+          地图保留为地理位置参考视图，用于帮助将格网热点与真实海域位置对应起来。矩阵图负责比较图层，地图负责回到空间语境。
         </p>
-      </article>
+      </InfoDisclosure>
       <article class="page-card map-card">
         <iframe src="/demo/regional_demo_map.html" title="区域风险地图"></iframe>
       </article>

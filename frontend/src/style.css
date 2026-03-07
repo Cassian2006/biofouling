@@ -154,6 +154,7 @@ img {
 .summary-stack,
 .stat-card,
 .module-card,
+.info-disclosure,
 .feature-panel,
 .list-card,
 .map-card,
@@ -331,6 +332,67 @@ img {
 
 .text-card p {
   margin: 0;
+}
+
+.info-disclosure {
+  padding: 18px 20px;
+}
+
+.info-disclosure[open] {
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.info-disclosure__summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.info-disclosure__summary::-webkit-details-marker {
+  display: none;
+}
+
+.info-disclosure__summary strong {
+  display: block;
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.info-disclosure__summary p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.info-disclosure__hint {
+  flex: 0 0 auto;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: rgba(15, 118, 110, 0.08);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.info-disclosure[open] .info-disclosure__hint {
+  background: rgba(180, 83, 9, 0.1);
+  color: var(--warm);
+}
+
+.info-disclosure__body {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.info-disclosure__body p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
 }
 
 .map-card iframe {
