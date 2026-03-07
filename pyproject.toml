@@ -15,6 +15,11 @@ dependencies = [
     "xarray>=2025.1.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0.0",
+]
+
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
@@ -22,3 +27,5 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 packages = []
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
