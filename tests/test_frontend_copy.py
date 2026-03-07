@@ -12,11 +12,14 @@ def test_tooltip_and_map_components_exist() -> None:
     tooltip = read_text("frontend/src/components/HintTooltip.vue")
     overview_map = read_text("frontend/src/components/RiskOverviewMap.vue")
     vessel_map = read_text("frontend/src/components/VesselTrackMap.vue")
+    method_drawer = read_text("frontend/src/components/MethodDrawer.vue")
 
     assert "hint-tooltip__bubble" in tooltip
     assert "leaflet" in overview_map.lower()
     assert "DISPLAY_SUBDIVISIONS = 1" in overview_map
     assert "leaflet" in vessel_map.lower()
+    assert "FPI = 0.5" in method_drawer
+    assert "RRI = 0.40" in method_drawer
 
 
 def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
@@ -35,3 +38,10 @@ def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
 
     assert 'redirect: "/"' in router
     assert 'to="/regional-risk"' not in app_shell
+
+
+def test_app_shell_exposes_method_entry() -> None:
+    app_shell = read_text("frontend/src/App.vue")
+
+    assert "核心算法" in app_shell
+    assert "MethodDrawer" in app_shell
