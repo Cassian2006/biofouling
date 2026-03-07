@@ -25,9 +25,9 @@ const selectedHotspotKey = ref("");
 
 const layerOptions = [
   { key: "rri_score", title: "综合风险", shortLabel: "RRI" },
-  { key: "traffic_score", title: "交通暴露", shortLabel: "交通" },
-  { key: "low_speed_score", title: "低速暴露", shortLabel: "低速" },
-  { key: "environment_score", title: "环境暴露", shortLabel: "环境" },
+  { key: "traffic_score", title: "船多不多", shortLabel: "船流" },
+  { key: "low_speed_score", title: "停得久不久", shortLabel: "停留" },
+  { key: "environment_score", title: "海水条件", shortLabel: "海水" },
 ];
 
 const topVessels = computed(() => vessels.value.slice(0, 8));
@@ -55,9 +55,9 @@ const hotspotSummary = computed(() => {
   if (!cell) return [];
   return [
     { label: "综合风险", value: cell.rri_score },
-    { label: "交通暴露", value: cell.traffic_score },
-    { label: "低速暴露", value: cell.low_speed_score },
-    { label: "环境暴露", value: cell.environment_score },
+    { label: "船多不多", value: cell.traffic_score },
+    { label: "停得久不久", value: cell.low_speed_score },
+    { label: "海水条件", value: cell.environment_score },
   ];
 });
 
@@ -93,7 +93,7 @@ onMounted(async () => {
       selectedHotspotKey.value = `${sortedCells.value[0].grid_lat}-${sortedCells.value[0].grid_lon}`;
     }
   } catch {
-    // Shared loading and error state already handles rendering.
+    // Shared state already handles rendering.
   }
 });
 </script>
@@ -149,7 +149,7 @@ onMounted(async () => {
       <article class="page-card stat-card">
         <span class="stat-label">中风险格网</span>
         <strong class="stat-value">{{ summary.medium_risk_cells }}</strong>
-        <p>代表需要持续跟踪的区域暴露带。</p>
+        <p>代表需要持续跟踪的区域。</p>
       </article>
       <article class="page-card stat-card">
         <span class="stat-label">优先评估清洗</span>
@@ -159,7 +159,7 @@ onMounted(async () => {
       <article class="page-card stat-card">
         <span class="stat-label">高度异常船舶</span>
         <strong class="stat-value">{{ anomalyCounts.highly_abnormal || 0 }}</strong>
-        <p>基于 Autoencoder 暴露模式识别出的异常对象。</p>
+        <p>暴露模式与同批对象差异最大的那一批船。</p>
       </article>
     </section>
 
@@ -168,7 +168,7 @@ onMounted(async () => {
         <p class="section-kicker">Spatial View</p>
         <h3>
           区域主地图
-          <HintTooltip text="地图基于真实风险格网绘制，展示当前空间风险、热点格网与港口/锚地参考点。" />
+          <HintTooltip text="地图展示空间风险，以及某个区域到底是船多、停留久，还是海水条件更特殊。" />
         </h3>
       </div>
       <div class="split-grid detail-layout dashboard-map-layout">
@@ -193,7 +193,7 @@ onMounted(async () => {
               @click="selectLayer(item.key)"
             >
               <strong>{{ item.title }}</strong>
-              <span>按 {{ item.shortLabel }} 分值排序与着色</span>
+              <span>按 {{ item.shortLabel }} 视角查看</span>
             </button>
           </article>
 
@@ -229,7 +229,7 @@ onMounted(async () => {
             <div class="module-head">
               <h4>
                 热点格网列表
-                <HintTooltip text="列表与地图使用相同的图层口径，切换图层后排序会同步更新。" />
+                <HintTooltip text="列表与地图使用相同口径，切换视角后排序会同步更新。" />
               </h4>
             </div>
             <button
@@ -259,7 +259,7 @@ onMounted(async () => {
         <p class="section-kicker">Anomaly</p>
         <h3>
           异常暴露筛查
-          <HintTooltip text="基于 Autoencoder 对船舶行为与环境特征进行重建，偏离正常模式越大，异常分数越高。" />
+          <HintTooltip text="用于快速找出哪艘船的暴露模式明显不正常。" />
         </h3>
       </div>
       <div class="split-grid detail-layout">
@@ -286,7 +286,7 @@ onMounted(async () => {
             </div>
           </div>
           <p class="support-text anomaly-caption">
-            异常检测用于从同批船舶中快速筛出暴露模式明显偏离常态的对象；观测不足对象不参与异常等级比较。
+            观测不足对象不参与异常等级比较，避免短轨迹或低点数样本误占异常榜。
           </p>
         </article>
 
@@ -294,7 +294,7 @@ onMounted(async () => {
           <div class="module-head">
             <h4>
               异常船舶榜单
-              <HintTooltip text="点击后进入单船页，可继续查看异常解释、轨迹与 FPI 预测结果。" />
+              <HintTooltip text="点击后进入单船页，可继续查看一句话结论、详细偏离项和轨迹表现。" />
             </h4>
           </div>
           <RouterLink

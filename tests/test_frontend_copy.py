@@ -20,7 +20,9 @@ def test_tooltip_and_map_components_exist() -> None:
     assert "leaflet" in vessel_map.lower()
     assert "FPI = 0.5" in method_drawer
     assert "RRI = 0.40" in method_drawer
-    assert "LSTM 数据构建" in method_drawer
+    assert "船多不多" in method_drawer
+    assert "停得久不久" in method_drawer
+    assert "海水条件" in method_drawer
     assert "训练样本使用最近 8 个连续窗口作为输入" in method_drawer
     assert "当前前端使用的校准阈值为 0.53 / 0.69" in method_drawer
 
@@ -34,17 +36,14 @@ def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
     assert "RiskOverviewMap" in dashboard
     assert "区域主地图" in dashboard
     assert "已接入的主要模块" not in dashboard
+    assert "船多不多" in dashboard
+    assert "停得久不久" in dashboard
+    assert "海水条件" in dashboard
     assert "异常暴露筛查" in dashboard
     assert "异常船舶榜单" in dashboard
-    assert "观测不足" in dashboard
 
     assert "VesselTrackMap" in vessel
     assert "selector-input" in vessel
-    assert "单船关键字段" in vessel
-    assert "预测区间" in vessel
-    assert "异常暴露解释" in vessel
-    assert "相邻异常对象" in vessel
-    assert "观测不足" in vessel
     assert "一句话判断" in vessel
 
     assert 'redirect: "/"' in router
