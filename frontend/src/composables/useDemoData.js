@@ -219,6 +219,7 @@ function buildAnomalySummaryFallback() {
       anomaly_score: item.fpi_proxy,
       anomaly_level: index < 6 ? "highly_abnormal" : "suspicious",
       explanations: ["当前回退为静态演示数据，异常解释未接入。"],
+      summary_sentence: "当前为静态回退结果，暂未生成正式异常结论。",
     })),
   };
 }
@@ -250,7 +251,9 @@ async function fetchVesselAnomaly(mmsi) {
         anomaly_score: match.anomaly_score,
         anomaly_level: match.anomaly_level,
         percentile_rank: Number((1 - (match.rank - 1) / Math.max(fallbackSummary.vessel_count - 1, 1)).toFixed(4)),
+        summary_sentence: match.summary_sentence,
         explanations: match.explanations,
+        driver_details: [],
         peer_anomalies: fallbackSummary.top_anomalies.filter((item) => item.mmsi !== String(mmsi)).slice(0, 6),
       };
     }
@@ -260,7 +263,9 @@ async function fetchVesselAnomaly(mmsi) {
       anomaly_score: 0,
       anomaly_level: "normal",
       percentile_rank: 0.5,
+      summary_sentence: "当前没有可用的异常检测结果。",
       explanations: ["当前没有可用的异常检测结果。"],
+      driver_details: [],
       peer_anomalies: fallbackSummary.top_anomalies.slice(0, 6),
     };
   }

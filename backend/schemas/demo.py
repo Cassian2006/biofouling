@@ -210,6 +210,16 @@ class VesselAnomalyRecord(BaseModel):
     anomaly_score: float
     anomaly_level: str
     explanations: list[str]
+    summary_sentence: str | None = None
+
+
+class VesselAnomalyDriver(BaseModel):
+    feature_key: str
+    feature_label: str
+    vessel_value: float | None
+    cohort_median: float | None
+    direction: str
+    interpretation: str
 
 
 class VesselAnomalyResponse(BaseModel):
@@ -225,7 +235,9 @@ class VesselAnomalyDetailResponse(BaseModel):
     anomaly_score: float
     anomaly_level: str
     percentile_rank: float
+    summary_sentence: str
     explanations: list[str]
+    driver_details: list[VesselAnomalyDriver]
     peer_anomalies: list[VesselAnomalyRecord]
 
 

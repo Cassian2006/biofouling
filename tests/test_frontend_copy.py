@@ -45,6 +45,7 @@ def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
     assert "异常暴露解释" in vessel
     assert "相邻异常对象" in vessel
     assert "观测不足" in vessel
+    assert "一句话判断" in vessel
 
     assert 'redirect: "/"' in router
     assert 'to="/regional-risk"' not in app_shell

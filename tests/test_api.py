@@ -74,6 +74,8 @@ def test_vessel_detail_track_and_trend_endpoints_return_real_payloads() -> None:
     assert anomaly_payload["mmsi"] == "268240302"
     assert anomaly_payload["anomaly_level"] in {"normal", "suspicious", "highly_abnormal", "observation_insufficient"}
     assert anomaly_payload["anomaly_score"] >= 0
+    assert anomaly_payload["summary_sentence"]
+    assert isinstance(anomaly_payload["driver_details"], list)
     assert len(anomaly_payload["peer_anomalies"]) <= 6
 
     assert report_response.status_code == 200
@@ -125,6 +127,7 @@ def test_regional_endpoints_return_expected_distribution() -> None:
         "observation_insufficient": 151,
     }
     assert anomaly_payload["top_anomalies"][0]["mmsi"] == "563215100"
+    assert anomaly_payload["top_anomalies"][0]["summary_sentence"]
     assert all(item["anomaly_level"] != "observation_insufficient" for item in anomaly_payload["top_anomalies"])
 
 

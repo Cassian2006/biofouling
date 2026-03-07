@@ -525,6 +525,21 @@ watch(
               <strong>前 {{ anomalyHeadline?.percentile }}</strong>
             </div>
           </div>
+          <div v-if="vesselAnomaly?.summary_sentence" class="list-row">
+            <div>
+              <strong>一句话判断</strong>
+              <span>{{ vesselAnomaly.summary_sentence }}</span>
+            </div>
+          </div>
+          <div v-if="vesselAnomaly?.driver_details?.length" class="signal-chip-list">
+            <div v-for="driver in vesselAnomaly.driver_details" :key="driver.feature_key" class="signal-chip">
+              <strong>{{ driver.feature_label }}</strong>
+              <span>
+                当前值 {{ driver.vessel_value ?? "暂无" }} · 样本中位数 {{ driver.cohort_median ?? "暂无" }}
+              </span>
+              <small>{{ driver.interpretation }}</small>
+            </div>
+          </div>
           <div v-if="vesselAnomaly?.explanations?.length" class="signal-chip-list">
             <div v-for="item in vesselAnomaly.explanations" :key="item" class="signal-chip">
               <strong>异常驱动</strong>
