@@ -20,10 +20,11 @@ def test_demo_summary_endpoint_returns_real_counts() -> None:
     payload = response.json()
 
     assert response.status_code == 200
-    assert payload["vessels_summarized"] == 52
-    assert payload["grid_cells"] == 642
+    assert payload["window_label"] == "20260115 to 20260130"
+    assert payload["vessels_summarized"] == 637
+    assert payload["grid_cells"] == 1143
     assert payload["high_risk_cells"] == 1
-    assert payload["medium_risk_cells"] == 31
+    assert payload["medium_risk_cells"] == 78
 
 
 def test_vessel_detail_track_and_trend_endpoints_return_real_payloads() -> None:
@@ -34,7 +35,7 @@ def test_vessel_detail_track_and_trend_endpoints_return_real_payloads() -> None:
 
     assert detail_response.status_code == 200
     detail_payload = detail_response.json()
-    assert detail_payload["rank_fraction"] == "1 / 52"
+    assert detail_payload["rank_fraction"] == "3 / 637"
     assert detail_payload["vessel"]["mean_salinity"] is not None
     assert detail_payload["vessel"]["mean_current_u"] is not None
     assert detail_payload["static_profile"]["profile_source"] == "ais_derived"
@@ -67,16 +68,17 @@ def test_regional_endpoints_return_expected_distribution() -> None:
     cells_payload = cells_response.json()
 
     assert stats_response.status_code == 200
-    assert stats_payload["total_cells"] == 642
-    assert stats_payload["risk_level_counts"] == {"high": 1, "medium": 31, "low": 610}
+    assert stats_payload["window_label"] == "20260115 to 20260130"
+    assert stats_payload["total_cells"] == 1143
+    assert stats_payload["risk_level_counts"] == {"high": 1, "medium": 78, "low": 1064}
     assert len(stats_payload["reference_sites"]) == 8
     assert stats_payload["reference_sites"][0]["site_type"] in {"port", "anchorage"}
 
     assert cells_response.status_code == 200
-    assert len(cells_payload) == 642
+    assert len(cells_payload) == 1143
     assert cells_payload[0]["grid_lat"] == 1.275
     assert cells_payload[0]["grid_lon"] == 103.775
-    assert cells_payload[0]["rri_score"] == 0.709
+    assert cells_payload[0]["rri_score"] == 0.712
     assert cells_payload[0]["traffic_score"] == 1.0
     assert cells_payload[0]["nearest_reference_name"] is not None
 

@@ -1,0 +1,20 @@
+{
+  "mode": "region_events",
+  "start_time": "2026-01-15T00:00:00Z",
+  "end_time": "2026-01-30T00:00:00Z",
+  "slice_hours": 6,
+  "retry_delay_seconds": 30,
+  "output_dir": "data/raw/ais_jobs/region_discovery_20260115_20260130",
+  "state_file": "data/raw/ais_jobs/region_discovery_20260115_20260130/state.json",
+  "region": {
+    "regionType": "rectangle",
+    "leftTop": {
+      "lon": 102.9,
+      "lat": 1.85
+    },
+    "rightBottom": {
+      "lon": 104.9,
+      "lat": 0.8
+    }
+  }
+}

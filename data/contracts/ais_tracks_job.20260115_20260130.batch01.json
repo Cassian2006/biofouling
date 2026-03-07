@@ -1,0 +1,10 @@
+{
+  "mode": "tracks",
+  "start_time": "2026-01-15T00:00:00Z",
+  "end_time": "2026-01-30T00:00:00Z",
+  "slice_hours": 12,
+  "retry_delay_seconds": 30,
+  "output_dir": "data/raw/ais_jobs/tracks_20260115_20260130/batch01",
+  "state_file": "data/raw/ais_jobs/tracks_20260115_20260130/batch01/state.json",
+  "mmsi_csv": "data/raw/mmsi_seed_20260115_20260130_batch01.csv"
+}

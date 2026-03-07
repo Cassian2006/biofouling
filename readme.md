@@ -1148,3 +1148,62 @@ project/
 
 楠岃瘉缁撴灉锛?- `pytest` 閫氳繃锛屽綋鍓嶇粨鏋滀负 `18 passed`
 - 鍓嶇 `npm run build` 閫氳繃
+37. 15 天时间窗扩展与 1.0 收口前验证（2026-03-07）
+本轮把项目的真实数据时间窗从 `2026-01-15` 到 `2026-01-18` 扩展到 `2026-01-15` 到 `2026-01-30`，目标不是单纯多下几天数据，而是验证当前 1.0 的整条链路是否能在更接近真实使用规模的窗口下继续稳定工作。
+
+本轮完成：
+- 新增 15 天环境下载任务文件：
+  - `data/contracts/copernicus_thetao_20260115_20260130.json`
+  - `data/contracts/copernicus_chl_20260115_20260130.json`
+  - `data/contracts/copernicus_so_20260115_20260130.json`
+  - `data/contracts/copernicus_currents_20260115_20260130.json`
+- 新增 15 天 AIS 区域发现与轨迹下载任务文件：
+  - `data/contracts/ais_region_job.20260115_20260130.json`
+  - `data/contracts/ais_tracks_job.20260115_20260130.batch01.json`
+  - `data/contracts/ais_tracks_job.20260115_20260130.batch02.json`
+  - `data/contracts/ais_tracks_job.20260115_20260130.batch03.json`
+  - `data/contracts/ais_tracks_job.20260115_20260130.batch04.json`
+- 已真实下载 15 天环境数据：
+  - `thetao`
+  - `chl`
+  - `so`
+  - `uo/vo`
+- 已完成 15 天 AIS 区域发现与全量轨迹下载：
+  - 区域发现切片：`60`
+  - 识别唯一 MMSI：`637`
+  - 轨迹切片总数：`19110`
+  - 轨迹切片完成数：`19110`
+- 已跑通 15 天处理链：
+  - AIS 扁平化：`2838912` 条点
+  - 研究区清洗后：`568155` 条点
+  - 单船特征：`637` 艘
+  - 区域风险细格网：`1143` 个
+- 已重新生成：
+  - `outputs/reports/voyage_report_20260115_20260130.md`
+  - `outputs/demo/`
+  - `frontend/public/demo/`
+
+关键结果：
+- 当前后端 `/api/demo/summary` 已自动切换到 `20260115 to 20260130`
+- 当前建议分布更新为：
+  - `Prioritize cleaning assessment: 284`
+  - `Monitor exposure trend: 340`
+  - `Low immediate concern: 13`
+- 当前区域风险分布更新为：
+  - `high: 1`
+  - `medium: 78`
+  - `low: 1064`
+- 当前最高风险格网为：
+  - `grid_lat = 1.275`
+  - `grid_lon = 103.775`
+  - `rri_score = 0.712`
+
+这轮的意义：
+- 它证明当前 1.0 不只是在 `3 天` 冒烟窗口下可用，而是已经能支撑 `15 天` 量级的真实数据闭环。
+- AIS 下载渠道与 Copernicus 环境下载渠道都已在更长窗口下再次验证通过。
+- 前端、后端、报告和 demo 资产都已经跟上新的时间窗，不是只有脚本层更新。
+- 这说明 1.0 的核心目标已经非常接近收口，后续工作更适合转向体验打磨与 1.5 的轻量深度模块规划。
+
+验证结果：
+- `pytest` 已作为提交前固定步骤继续执行
+- 前端 `npm run build` 通过
