@@ -177,27 +177,29 @@ class ForecastHistoryPoint(BaseModel):
 
 
 class VesselForecastResponse(BaseModel):
+    available: bool
+    unavailable_reason: str | None = None
     window_label: str
     mmsi: str
-    history_start: str
-    history_end: str
-    forecast_window_start: str
-    forecast_window_end: str
-    predicted_fpi: float
-    predicted_risk_label: str
-    raw_predicted_risk_label: str
-    low_threshold: float
-    high_threshold: float
+    history_start: str | None
+    history_end: str | None
+    forecast_window_start: str | None
+    forecast_window_end: str | None
+    predicted_fpi: float | None
+    predicted_risk_label: str | None
+    raw_predicted_risk_label: str | None
+    low_threshold: float | None
+    high_threshold: float | None
     validation_rmse: float | None
     validation_r2: float | None
     raw_accuracy: float | None
     calibrated_accuracy: float | None
-    confidence_band_low: float
-    confidence_band_high: float
-    confidence_level: str
-    model_name: str
-    history_windows: int
-    window_hours: int
+    confidence_band_low: float | None
+    confidence_band_high: float | None
+    confidence_level: str | None
+    model_name: str | None
+    history_windows: int | None
+    window_hours: int | None
     signals: list[ForecastSignal]
     history_points: list[ForecastHistoryPoint]
 

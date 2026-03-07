@@ -38,6 +38,7 @@ const validationSummary = computed(() => vesselDetail.value?.validation_summary 
 const nearestReference = computed(() => vesselDetail.value?.nearest_reference || null);
 const forecastSignals = computed(() => vesselForecast.value?.signals || []);
 const forecastHistoryPoints = computed(() => vesselForecast.value?.history_points || []);
+const forecastAvailable = computed(() => Boolean(vesselForecast.value?.available));
 
 const vesselOptions = computed(() =>
   vessels.value.map((item) => ({
@@ -181,13 +182,15 @@ const validationFacts = computed(() => {
 const compactSummary = computed(() => {
   if (!selectedVessel.value || !vesselTrack.value) return "";
   const forecastSummary = vesselForecast.value
-    ? `下一时间窗预测 FPI ${vesselForecast.value.predicted_fpi}，预测等级 ${vesselForecast.value.predicted_risk_label}。`
+    ? forecastAvailable.value
+      ? `下一时间窗预测 FPI ${vesselForecast.value.predicted_fpi}，预测等级 ${vesselForecast.value.predicted_risk_label}。`
+      : `当前对象暂未生成 LSTM 预测。`
     : "";
   return `轨迹记录 ${vesselTrack.value.point_count} 点，时间跨度 ${selectedVessel.value.track_duration_hours} 小时，低速暴露比例 ${selectedVessel.value.low_speed_ratio ?? "暂无"}，建议为“${selectedVessel.value.recommendation}”。${forecastSummary}`;
 });
 
 const forecastGauge = computed(() => {
-  if (!vesselForecast.value) return null;
+  if (!vesselForecast.value || !forecastAvailable.value) return null;
   const totalWidth = 100;
   const clamp = (value) => Math.max(0, Math.min(totalWidth, value));
   const valueX = clamp(vesselForecast.value.predicted_fpi * totalWidth);
@@ -206,7 +209,7 @@ const forecastGauge = computed(() => {
 });
 
 const forecastHistorySvg = computed(() => {
-  if (!vesselForecast.value || !forecastHistoryPoints.value.length) return null;
+  if (!vesselForecast.value || !forecastAvailable.value || !forecastHistoryPoints.value.length) return null;
   const width = 620;
   const height = 170;
   const paddingLeft = 18;
@@ -485,7 +488,7 @@ watch(
       </div>
       <div class="split-grid detail-layout">
         <article class="page-card forecast-card">
-          <div v-if="vesselForecast" class="forecast-stack">
+          <div v-if="vesselForecast && forecastAvailable" class="forecast-stack">
             <div class="forecast-score-row">
               <div>
                 <p class="forecast-label">预测 FPI</p>
@@ -578,6 +581,9 @@ watch(
               </div>
             </div>
           </div>
+          <div v-else-if="vesselForecast" class="empty-state track-empty">
+            {{ vesselForecast.unavailable_reason || "当前对象暂未生成预测结果。" }}
+          </div>
           <div v-else class="empty-state track-empty">
             {{ forecastError || "当前没有可展示的预测结果。" }}
           </div>
@@ -587,23 +593,29 @@ watch(
           <div class="module-head">
             <h4>预测解释</h4>
           </div>
-          <div v-if="vesselForecast" class="list-row">
+          <div v-if="vesselForecast && forecastAvailable" class="list-row">
             <div>
               <strong>模型口径</strong>
               <span>当前使用 {{ vesselForecast.model_name }}，最近 {{ vesselForecast.history_windows }} 个窗口预测未来 {{ vesselForecast.window_hours }} 小时。</span>
             </div>
           </div>
-          <div v-if="vesselForecast" class="list-row">
+          <div v-if="vesselForecast && forecastAvailable" class="list-row">
             <div>
               <strong>等级校准</strong>
               <span>校准阈值为 low / medium {{ vesselForecast.low_threshold }}，medium / high {{ vesselForecast.high_threshold }}，用于改善前端标签判读。</span>
             </div>
           </div>
-          <div v-if="vesselForecast" class="signal-chip-list">
+          <div v-if="vesselForecast && forecastAvailable" class="signal-chip-list">
             <div v-for="signal in forecastSignals" :key="signal.title" class="signal-chip">
               <strong>{{ signal.title }}</strong>
               <span>{{ signal.value }} · {{ signal.assessment }}</span>
               <small>{{ signal.detail }}</small>
+            </div>
+          </div>
+          <div v-else-if="vesselForecast" class="list-row">
+            <div>
+              <strong>未生成原因</strong>
+              <span>{{ vesselForecast.unavailable_reason }}</span>
             </div>
           </div>
           <div v-else class="list-row">

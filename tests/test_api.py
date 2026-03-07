@@ -60,6 +60,7 @@ def test_vessel_detail_track_and_trend_endpoints_return_real_payloads() -> None:
     forecast_payload = forecast_response.json()
     assert forecast_response.status_code == 200
     assert forecast_payload["mmsi"] == "268240302"
+    assert forecast_payload["available"] is True
     assert forecast_payload["predicted_fpi"] >= 0
     assert forecast_payload["predicted_risk_label"] in {"low", "medium", "high"}
     assert forecast_payload["raw_predicted_risk_label"] in {"low", "medium", "high"}
@@ -69,6 +70,18 @@ def test_vessel_detail_track_and_trend_endpoints_return_real_payloads() -> None:
 
     assert report_response.status_code == 200
     assert report_response.json()["scope"] == "vessel"
+
+
+def test_vessel_forecast_endpoint_reports_unavailable_when_history_is_insufficient() -> None:
+    response = client.get("/api/demo/vessels/209594000/forecast")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["mmsi"] == "209594000"
+    assert payload["available"] is False
+    assert payload["predicted_fpi"] is None
+    assert payload["history_points"] == []
+    assert "连续历史窗口" in payload["unavailable_reason"]
 
 
 def test_regional_endpoints_return_expected_distribution() -> None:

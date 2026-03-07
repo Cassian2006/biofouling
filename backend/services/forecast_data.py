@@ -12,6 +12,7 @@ from backend.schemas.demo import ForecastHistoryPoint, ForecastSignal, VesselFor
 from backend.services.demo_data import (
     PROCESSED_DIR,
     PROJECT_ROOT,
+    get_demo_vessels,
     _latest_file,
     _load_ais_csv,
     _load_csv,
@@ -311,5 +312,38 @@ def get_vessel_forecast(mmsi: str) -> VesselForecastResponse:
     forecasts = load_forecast_payload()["forecasts"]  # type: ignore[assignment]
     for forecast in forecasts:
         if forecast["mmsi"] == mmsi:
-            return VesselForecastResponse(**forecast)
-    raise LookupError(f"Forecast for vessel {mmsi} not found")
+            return VesselForecastResponse(available=True, unavailable_reason=None, **forecast)
+
+    vessel_exists = any(vessel.mmsi == mmsi for vessel in get_demo_vessels())
+    if not vessel_exists:
+        raise LookupError(f"Forecast for vessel {mmsi} not found")
+
+    model_dir = _select_best_model_dir()
+    features_path = _latest_file(PROCESSED_DIR, "vessel_features_*.csv")
+    return VesselForecastResponse(
+        available=False,
+        unavailable_reason="当前对象缺少足够的连续历史窗口，暂未生成 LSTM 预测。",
+        window_label=_window_label_from_features(features_path),
+        mmsi=mmsi,
+        history_start=None,
+        history_end=None,
+        forecast_window_start=None,
+        forecast_window_end=None,
+        predicted_fpi=None,
+        predicted_risk_label=None,
+        raw_predicted_risk_label=None,
+        low_threshold=None,
+        high_threshold=None,
+        validation_rmse=None,
+        validation_r2=None,
+        raw_accuracy=None,
+        calibrated_accuracy=None,
+        confidence_band_low=None,
+        confidence_band_high=None,
+        confidence_level=None,
+        model_name=model_dir.name,
+        history_windows=None,
+        window_hours=None,
+        signals=[],
+        history_points=[],
+    )
