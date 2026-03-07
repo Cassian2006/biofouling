@@ -27,6 +27,7 @@ const selectedVessel = computed(() => vesselDetail.value?.vessel || null);
 const peerVessels = computed(() => vesselDetail.value?.peer_vessels || []);
 const staticProfile = computed(() => vesselDetail.value?.static_profile || null);
 const validationSummary = computed(() => vesselDetail.value?.validation_summary || null);
+const nearestReference = computed(() => vesselDetail.value?.nearest_reference || null);
 
 const vesselFacts = computed(() => {
   if (!selectedVessel.value) return [];
@@ -115,6 +116,15 @@ const staticFacts = computed(() => {
       title: "主目的地 / 航行状态",
       value: `${staticProfile.value.dominant_destination || "暂无"} / ${staticProfile.value.dominant_nav_status || "暂无"}`,
       description: "这是当前由 AIS 派生出的基础船舶画像，用来补充行为解释。",
+    },
+    {
+      title: "最近港口 / 锚地",
+      value: nearestReference.value
+        ? `${nearestReference.value.name} (${nearestReference.value.site_type})`
+        : "暂无",
+      description: nearestReference.value
+        ? `当前按船舶平均位置匹配，距离约 ${vesselDetail.value?.nearest_reference_distance_km ?? "暂无"} km。`
+        : "当前还没有可用的港口或锚地参考匹配。",
     },
   ];
 });

@@ -55,6 +55,16 @@ class ValidationSummary(BaseModel):
     notes_count: int
 
 
+class ReferenceSiteRecord(BaseModel):
+    site_id: str
+    name: str
+    site_type: str
+    zone: str
+    latitude: float
+    longitude: float
+    description: str | None
+
+
 class RiskCellRecord(BaseModel):
     rank: int
     grid_lat: float | None
@@ -69,6 +79,10 @@ class RiskCellRecord(BaseModel):
     environment_score: float | None
     rri_score: float | None
     risk_level: str
+    nearest_reference_name: str | None
+    nearest_reference_type: str | None
+    nearest_reference_zone: str | None
+    nearest_reference_distance_km: float | None
 
 
 class TopVesselSummary(BaseModel):
@@ -106,6 +120,8 @@ class VesselDetailResponse(BaseModel):
     peer_vessels: list[VesselRecord]
     static_profile: VesselStaticProfile | None
     validation_summary: ValidationSummary
+    nearest_reference: ReferenceSiteRecord | None
+    nearest_reference_distance_km: float | None
 
 
 class VesselTrackPoint(BaseModel):
@@ -158,6 +174,7 @@ class RegionalStatsResponse(BaseModel):
     average_environment_score: float | None
     top_cell: RiskCellRecord
     top_cells: list[RiskCellRecord]
+    reference_sites: list[ReferenceSiteRecord]
 
 
 class ReportPreviewResponse(BaseModel):

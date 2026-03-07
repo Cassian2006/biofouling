@@ -38,6 +38,8 @@ def test_vessel_detail_track_and_trend_endpoints_return_real_payloads() -> None:
     assert detail_payload["vessel"]["mean_current_u"] is not None
     assert detail_payload["static_profile"]["profile_source"] == "ais_derived"
     assert detail_payload["validation_summary"]["event_count"] == 0
+    assert detail_payload["nearest_reference"] is not None
+    assert detail_payload["nearest_reference_distance_km"] is not None
 
     track_payload = track_response.json()
     assert track_response.status_code == 200
@@ -66,11 +68,14 @@ def test_regional_endpoints_return_expected_distribution() -> None:
     assert stats_response.status_code == 200
     assert stats_payload["total_cells"] == 222
     assert stats_payload["risk_level_counts"] == {"high": 1, "medium": 16, "low": 205}
+    assert len(stats_payload["reference_sites"]) == 8
+    assert stats_payload["reference_sites"][0]["site_type"] in {"port", "anchorage"}
 
     assert cells_response.status_code == 200
     assert len(cells_payload) == 222
     assert cells_payload[0]["rri_score"] == 0.692
     assert cells_payload[0]["traffic_score"] == 1.0
+    assert cells_payload[0]["nearest_reference_name"] is not None
 
 
 def test_unknown_api_route_returns_404() -> None:

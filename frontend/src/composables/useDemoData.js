@@ -55,6 +55,7 @@ function buildRegionalStatsFallback() {
     average_environment_score: average("environment_score"),
     top_cell: riskCells.value[0] || null,
     top_cells: riskCells.value.slice(0, 10),
+    reference_sites: [],
   };
 }
 
@@ -80,6 +81,8 @@ function buildVesselDetailFallback(mmsi) {
       latest_port_name: null,
       notes_count: 0,
     },
+    nearest_reference: null,
+    nearest_reference_distance_km: null,
   };
 }
 

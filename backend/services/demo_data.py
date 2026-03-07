@@ -1,10 +1,12 @@
 from functools import lru_cache
 from pathlib import Path
 
+import math
 import pandas as pd
 
 from backend.schemas.demo import (
     DemoSummaryResponse,
+    ReferenceSiteRecord,
     RegionalStatsResponse,
     ReportPreviewResponse,
     RiskCellRecord,
@@ -26,6 +28,7 @@ from scripts.summarize_validation_events import load_validation_events, summariz
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 EXTERNAL_DIR = PROJECT_ROOT / "data" / "external"
+REFERENCE_DIR = PROJECT_ROOT / "data" / "reference"
 MAPS_DIR = PROJECT_ROOT / "outputs" / "maps"
 REPORTS_DIR = PROJECT_ROOT / "outputs" / "reports"
 
@@ -57,6 +60,68 @@ def _optional_latest_file(directory: Path, pattern: str) -> Path | None:
     if not matches:
         return None
     return matches[-1]
+
+
+def _load_reference_sites() -> pd.DataFrame:
+    path = REFERENCE_DIR / "singapore_reference_sites.csv"
+    if not path.exists():
+        return pd.DataFrame(
+            columns=["site_id", "name", "site_type", "zone", "latitude", "longitude", "description"]
+        )
+    dataframe = _load_csv(path)
+    dataframe["latitude"] = pd.to_numeric(dataframe["latitude"], errors="coerce")
+    dataframe["longitude"] = pd.to_numeric(dataframe["longitude"], errors="coerce")
+    return dataframe.dropna(subset=["latitude", "longitude"]).reset_index(drop=True)
+
+
+def _serialize_reference_sites(reference_sites: pd.DataFrame) -> list[ReferenceSiteRecord]:
+    records: list[ReferenceSiteRecord] = []
+    for row in reference_sites.itertuples(index=False):
+        records.append(
+            ReferenceSiteRecord(
+                site_id=str(row.site_id),
+                name=str(row.name),
+                site_type=str(row.site_type),
+                zone=str(row.zone),
+                latitude=round(float(row.latitude), 6),
+                longitude=round(float(row.longitude), 6),
+                description=str(row.description) if pd.notna(row.description) else None,
+            )
+        )
+    return records
+
+
+def _distance_km(latitude_a: float, longitude_a: float, latitude_b: float, longitude_b: float) -> float:
+    radius_km = 6371.0
+    lat_a = math.radians(latitude_a)
+    lat_b = math.radians(latitude_b)
+    delta_lat = math.radians(latitude_b - latitude_a)
+    delta_lon = math.radians(longitude_b - longitude_a)
+
+    hav = (
+        math.sin(delta_lat / 2) ** 2
+        + math.cos(lat_a) * math.cos(lat_b) * math.sin(delta_lon / 2) ** 2
+    )
+    return radius_km * 2 * math.atan2(math.sqrt(hav), math.sqrt(1 - hav))
+
+
+def _nearest_reference_from_sites(
+    latitude: float,
+    longitude: float,
+    reference_sites: list[ReferenceSiteRecord],
+) -> tuple[ReferenceSiteRecord | None, float | None]:
+    if not reference_sites:
+        return None, None
+
+    nearest = None
+    best_distance = None
+    for site in reference_sites:
+        distance = _distance_km(latitude, longitude, site.latitude, site.longitude)
+        if best_distance is None or distance < best_distance:
+            nearest = site
+            best_distance = distance
+
+    return nearest, round(best_distance, 2) if best_distance is not None else None
 
 
 def _maybe_round(value: object, digits: int = 3) -> float | None:
@@ -103,10 +168,18 @@ def _serialize_vessels(features: pd.DataFrame) -> list[VesselRecord]:
     return vessels
 
 
-def _serialize_risk_cells(risk: pd.DataFrame) -> list[RiskCellRecord]:
+def _serialize_risk_cells(
+    risk: pd.DataFrame,
+    reference_sites: list[ReferenceSiteRecord],
+) -> list[RiskCellRecord]:
     ordered = risk.sort_values(["rri_score", "traffic_points"], ascending=[False, False]).copy()
     cells: list[RiskCellRecord] = []
     for rank, row in enumerate(ordered.itertuples(index=False), start=1):
+        nearest_reference, nearest_distance = _nearest_reference_from_sites(
+            float(row.grid_lat),
+            float(row.grid_lon),
+            reference_sites,
+        )
         cells.append(
             RiskCellRecord(
                 rank=rank,
@@ -122,6 +195,10 @@ def _serialize_risk_cells(risk: pd.DataFrame) -> list[RiskCellRecord]:
                 environment_score=_maybe_round(row.environment_score),
                 rri_score=_maybe_round(row.rri_score),
                 risk_level=str(row.risk_level),
+                nearest_reference_name=nearest_reference.name if nearest_reference else None,
+                nearest_reference_type=nearest_reference.site_type if nearest_reference else None,
+                nearest_reference_zone=nearest_reference.zone if nearest_reference else None,
+                nearest_reference_distance_km=nearest_distance,
             )
         )
     return cells
@@ -298,8 +375,9 @@ def load_demo_payload() -> dict[str, object]:
     ais = _load_ais_csv(ais_path)
     vessel_catalog = _load_vessel_catalog(ais)
     validation_summary = _load_validation_summary()
+    reference_sites = _serialize_reference_sites(_load_reference_sites())
     vessels = _serialize_vessels(features)
-    risk_cells = _serialize_risk_cells(risk)
+    risk_cells = _serialize_risk_cells(risk, reference_sites)
     window_label = _window_label_from_features(features_path)
     recommendation_counts = _recommendation_counts(vessels)
     report_text = report_path.read_text(encoding="utf-8")
@@ -308,6 +386,7 @@ def load_demo_payload() -> dict[str, object]:
         "window_label": window_label,
         "vessels": vessels,
         "risk_cells": risk_cells,
+        "reference_sites": reference_sites,
         "report_text": report_text,
         "ais": ais,
         "vessel_catalog": vessel_catalog,
@@ -361,6 +440,12 @@ def get_vessel_detail(mmsi: str) -> VesselDetailResponse:
     vessels = get_demo_vessels()
     vessel = _find_vessel(mmsi)
     peer_vessels = [item for item in vessels if item.mmsi != mmsi][:8]
+    reference_sites = load_demo_payload()["reference_sites"]  # type: ignore[assignment]
+    nearest_reference, nearest_distance = (
+        _nearest_reference_from_sites(vessel.mean_latitude, vessel.mean_longitude, reference_sites)
+        if vessel.mean_latitude is not None and vessel.mean_longitude is not None
+        else (None, None)
+    )
     return VesselDetailResponse(
         window_label=load_demo_payload()["window_label"],  # type: ignore[arg-type]
         vessel=vessel,
@@ -369,6 +454,8 @@ def get_vessel_detail(mmsi: str) -> VesselDetailResponse:
         peer_vessels=peer_vessels,
         static_profile=_find_static_profile(mmsi),
         validation_summary=_find_validation_summary(mmsi),
+        nearest_reference=nearest_reference,
+        nearest_reference_distance_km=nearest_distance,
     )
 
 
@@ -450,6 +537,7 @@ def get_vessel_trend(mmsi: str, interval_hours: int = 6) -> VesselTrendResponse:
 
 def get_regional_stats() -> RegionalStatsResponse:
     risk_cells = get_demo_risk_cells()
+    reference_sites = load_demo_payload()["reference_sites"]  # type: ignore[assignment]
     total_cells = len(risk_cells)
     risk_level_counts = {
         "high": sum(1 for cell in risk_cells if cell.risk_level == "high"),
@@ -473,6 +561,7 @@ def get_regional_stats() -> RegionalStatsResponse:
         average_environment_score=average("environment_score"),
         top_cell=risk_cells[0],
         top_cells=risk_cells[:10],
+        reference_sites=reference_sites,
     )
 
 

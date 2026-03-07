@@ -1,0 +1,9 @@
+site_id,name,site_type,zone,latitude,longitude,description
+sg_tuas_port,Tuas Port,port,west,1.264,103.626,Western deep-sea port cluster used as the main western cargo reference.
+sg_jurong_port,Jurong Port,port,west,1.300,103.704,Industrial port reference on the western side of Singapore waters.
+sg_pasir_panjang,Pasir Panjang Terminal,port,south,1.264,103.760,Major southern container terminal reference.
+sg_keppel_terminal,Keppel Terminal,port,south,1.266,103.842,Central southern terminal reference near Singapore city waterfront.
+sg_main_anchorage,Singapore Main Anchorage,anchorage,central,1.240,103.900,Central anchorage reference used for waiting and servicing activity.
+sg_western_anchorage,Western Anchorage,anchorage,west,1.170,103.620,Western anchorage reference for slower waiting or holding activity.
+sg_eastern_bunkering,Eastern Bunkering Anchorage,anchorage,east,1.210,104.050,Eastern anchorage reference associated with bunkering and waiting activity.
+sg_changi_anchorage,Changi Anchorage,anchorage,east,1.298,104.088,Eastern Singapore reference near Changi approaches.
