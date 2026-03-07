@@ -171,6 +171,11 @@ class ForecastSignal(BaseModel):
     detail: str
 
 
+class ForecastHistoryPoint(BaseModel):
+    window_start: str
+    fpi_proxy: float
+
+
 class VesselForecastResponse(BaseModel):
     window_label: str
     mmsi: str
@@ -194,6 +199,7 @@ class VesselForecastResponse(BaseModel):
     history_windows: int
     window_hours: int
     signals: list[ForecastSignal]
+    history_points: list[ForecastHistoryPoint]
 
 
 class RegionalStatsResponse(BaseModel):

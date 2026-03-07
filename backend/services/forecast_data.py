@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from backend.schemas.demo import ForecastSignal, VesselForecastResponse
+from backend.schemas.demo import ForecastHistoryPoint, ForecastSignal, VesselForecastResponse
 from backend.services.demo_data import (
     PROCESSED_DIR,
     PROJECT_ROOT,
@@ -174,6 +174,28 @@ def _build_signals(inference_frame: pd.DataFrame, row: pd.Series) -> list[Foreca
     ]
 
 
+def _history_points_for_vessel(
+    window_features: pd.DataFrame,
+    mmsi: str,
+    *,
+    history_windows: int,
+) -> list[ForecastHistoryPoint]:
+    vessel_history = (
+        window_features.loc[window_features["mmsi"].astype(str) == str(mmsi)]
+        .sort_values("window_start")
+        .tail(history_windows)
+    )
+    points: list[ForecastHistoryPoint] = []
+    for row in vessel_history.itertuples(index=False):
+        points.append(
+            ForecastHistoryPoint(
+                window_start=row.window_start.isoformat(),
+                fpi_proxy=round(float(row.fpi_proxy), 4),
+            )
+        )
+    return points
+
+
 @lru_cache(maxsize=2)
 def _load_forecast_payload_by_signature(signature: tuple[str, ...]) -> dict[str, object]:
     model_dir = _select_best_model_dir()
@@ -267,6 +289,11 @@ def _load_forecast_payload_by_signature(signature: tuple[str, ...]) -> dict[str,
                 "history_windows": history_windows,
                 "window_hours": window_hours,
                 "signals": _build_signals(inference_frame, row),
+                "history_points": _history_points_for_vessel(
+                    window_features,
+                    str(row["mmsi"]),
+                    history_windows=history_windows,
+                ),
             }
         )
 

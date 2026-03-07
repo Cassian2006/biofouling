@@ -37,6 +37,7 @@ const staticProfile = computed(() => vesselDetail.value?.static_profile || null)
 const validationSummary = computed(() => vesselDetail.value?.validation_summary || null);
 const nearestReference = computed(() => vesselDetail.value?.nearest_reference || null);
 const forecastSignals = computed(() => vesselForecast.value?.signals || []);
+const forecastHistoryPoints = computed(() => vesselForecast.value?.history_points || []);
 
 const vesselOptions = computed(() =>
   vessels.value.map((item) => ({
@@ -185,6 +186,97 @@ const compactSummary = computed(() => {
   return `轨迹记录 ${vesselTrack.value.point_count} 点，时间跨度 ${selectedVessel.value.track_duration_hours} 小时，低速暴露比例 ${selectedVessel.value.low_speed_ratio ?? "暂无"}，建议为“${selectedVessel.value.recommendation}”。${forecastSummary}`;
 });
 
+const forecastGauge = computed(() => {
+  if (!vesselForecast.value) return null;
+  const totalWidth = 100;
+  const clamp = (value) => Math.max(0, Math.min(totalWidth, value));
+  const valueX = clamp(vesselForecast.value.predicted_fpi * totalWidth);
+  const lowX = clamp(vesselForecast.value.low_threshold * totalWidth);
+  const highX = clamp(vesselForecast.value.high_threshold * totalWidth);
+  const bandLowX = clamp(vesselForecast.value.confidence_band_low * totalWidth);
+  const bandHighX = clamp(vesselForecast.value.confidence_band_high * totalWidth);
+
+  return {
+    lowX,
+    highX,
+    valueX,
+    bandLowX,
+    bandHighX,
+  };
+});
+
+const forecastHistorySvg = computed(() => {
+  if (!vesselForecast.value || !forecastHistoryPoints.value.length) return null;
+  const width = 620;
+  const height = 170;
+  const paddingLeft = 18;
+  const paddingRight = 18;
+  const topPadding = 18;
+  const bottomPadding = 34;
+  const innerWidth = width - paddingLeft - paddingRight;
+  const innerHeight = height - topPadding - bottomPadding;
+  const history = forecastHistoryPoints.value;
+  const values = history.map((item) => item.fpi_proxy);
+  values.push(vesselForecast.value.predicted_fpi);
+  const maxValue = Math.max(...values, vesselForecast.value.high_threshold, 0.8);
+  const minValue = Math.min(...values, 0);
+
+  const projectX = (index, total) =>
+    total <= 1 ? width / 2 : paddingLeft + (index / (total - 1)) * innerWidth;
+  const projectY = (value) => {
+    const span = Math.max(maxValue - minValue, 0.12);
+    const normalized = (value - minValue) / span;
+    return topPadding + innerHeight - normalized * innerHeight;
+  };
+
+  const historyPath = history
+    .map((item, index) => `${index === 0 ? "M" : "L"} ${projectX(index, history.length).toFixed(2)} ${projectY(item.fpi_proxy).toFixed(2)}`)
+    .join(" ");
+
+  const forecastX = projectX(history.length - 1, history.length) + (history.length > 1 ? innerWidth / (history.length - 1) : 0);
+  const forecastY = projectY(vesselForecast.value.predicted_fpi);
+  const thresholdLines = [
+    { label: "Low/Medium", value: vesselForecast.value.low_threshold },
+    { label: "Medium/High", value: vesselForecast.value.high_threshold },
+  ];
+
+  return {
+    width,
+    height,
+    history,
+    historyPath,
+    forecastX,
+    forecastY,
+    paddingLeft,
+    widthInnerEnd: width - paddingRight,
+    thresholdLines: thresholdLines.map((item) => ({
+      ...item,
+      y: projectY(item.value),
+    })),
+    points: history.map((item, index) => ({
+      label: item.window_start.slice(5, 16).replace("T", " "),
+      x: projectX(index, history.length),
+      y: projectY(item.fpi_proxy),
+      value: item.fpi_proxy,
+    })),
+    lastHistoryPointX: history.length ? projectX(history.length - 1, history.length) : paddingLeft,
+    lastHistoryPointY: history.length ? projectY(history[history.length - 1].fpi_proxy) : topPadding + innerHeight,
+  };
+});
+
+const trendSummary = computed(() => {
+  if (!vesselTrend.value?.windows?.length) return "";
+  const lowSpeedValues = vesselTrend.value.windows.map((item) => item.low_speed_ratio ?? 0);
+  const meanSogValues = vesselTrend.value.windows.map((item) => item.mean_sog ?? 0);
+  const allLowSpeed = lowSpeedValues.every((item) => item >= 0.999);
+  const speedMin = Math.min(...meanSogValues);
+  const speedMax = Math.max(...meanSogValues);
+  if (allLowSpeed) {
+    return `当前这艘船在所有 ${vesselTrend.value.windows.length} 个分窗内均处于低速状态，因此低速比例曲线会稳定贴近上边界。`;
+  }
+  return `当前分窗内平均航速范围 ${speedMin.toFixed(3)} ~ ${speedMax.toFixed(3)} 节，低速比例按动态坐标轴展示。`;
+});
+
 const svgTrend = computed(() => {
   if (!vesselTrend.value?.windows?.length) return null;
 
@@ -197,18 +289,29 @@ const svgTrend = computed(() => {
   const innerWidth = width - paddingLeft - paddingRight;
   const innerHeight = height - topPadding - bottomPadding;
   const windows = vesselTrend.value.windows;
-  const maxSog = Math.max(vesselTrend.value.max_mean_sog || 0, 1);
+  const sogValues = windows.map((item) => item.mean_sog ?? 0);
+  const ratioValues = windows.map((item) => item.low_speed_ratio ?? 0);
+  const sogMinRaw = Math.min(...sogValues);
+  const sogMaxRaw = Math.max(...sogValues);
+  const ratioMinRaw = Math.min(...ratioValues);
+  const ratioMaxRaw = Math.max(...ratioValues);
+  const sogSpan = Math.max(sogMaxRaw - sogMinRaw, 0.08);
+  const ratioSpan = Math.max(ratioMaxRaw - ratioMinRaw, 0.06);
+  const sogMin = Math.max(0, sogMinRaw - sogSpan * 0.15);
+  const sogMax = sogMaxRaw + sogSpan * 0.15;
+  const ratioMin = Math.max(0, ratioMinRaw - ratioSpan * 0.2);
+  const ratioMax = Math.min(1, ratioMaxRaw + ratioSpan * 0.2);
   const maxPointCount = Math.max(vesselTrend.value.max_point_count || 1, 1);
-  const lowSpeedMax = 1;
 
   const projectX = (index) => {
     if (windows.length === 1) return width / 2;
     return paddingLeft + (index / (windows.length - 1)) * innerWidth;
   };
 
-  const projectSogY = (value) => topPadding + innerHeight - (((value || 0) / maxSog) * innerHeight);
+  const projectSogY = (value) =>
+    topPadding + innerHeight - ((((value ?? sogMin) - sogMin) / Math.max(sogMax - sogMin, 0.01)) * innerHeight);
   const projectLowSpeedY = (value) =>
-    topPadding + innerHeight - (((value || 0) / lowSpeedMax) * innerHeight);
+    topPadding + innerHeight - ((((value ?? ratioMin) - ratioMin) / Math.max(ratioMax - ratioMin, 0.01)) * innerHeight);
 
   const speedPath = windows
     .map((item, index) => `${index === 0 ? "M" : "L"} ${projectX(index).toFixed(2)} ${projectSogY(item.mean_sog).toFixed(2)}`)
@@ -237,12 +340,12 @@ const svgTrend = computed(() => {
     };
   });
 
-  const speedAxis = [0, maxSog / 2, maxSog].map((value) => ({
-    value: value.toFixed(1),
+  const speedAxis = [sogMin, (sogMin + sogMax) / 2, sogMax].map((value) => ({
+    value: value.toFixed(3),
     y: projectSogY(value),
   }));
 
-  const ratioAxis = [0, 0.5, 1].map((value) => ({
+  const ratioAxis = [ratioMin, (ratioMin + ratioMax) / 2, ratioMax].map((value) => ({
     value: `${Math.round(value * 100)}%`,
     y: projectLowSpeedY(value),
   }));
@@ -409,6 +512,69 @@ watch(
               <div class="summary-metric">
                 <span>验证集 RMSE</span>
                 <strong>{{ vesselForecast.validation_rmse ?? "暂无" }}</strong>
+              </div>
+            </div>
+            <div v-if="forecastGauge" class="forecast-gauge-card">
+              <div class="forecast-gauge-track">
+                <div class="forecast-band forecast-band--low" :style="{ left: '0%', width: `${forecastGauge.lowX}%` }"></div>
+                <div
+                  class="forecast-band forecast-band--medium"
+                  :style="{ left: `${forecastGauge.lowX}%`, width: `${forecastGauge.highX - forecastGauge.lowX}%` }"
+                ></div>
+                <div
+                  class="forecast-band forecast-band--high"
+                  :style="{ left: `${forecastGauge.highX}%`, width: `${100 - forecastGauge.highX}%` }"
+                ></div>
+                <div
+                  class="forecast-confidence-band"
+                  :style="{ left: `${forecastGauge.bandLowX}%`, width: `${forecastGauge.bandHighX - forecastGauge.bandLowX}%` }"
+                ></div>
+                <div class="forecast-marker" :style="{ left: `${forecastGauge.valueX}%` }"></div>
+              </div>
+              <div class="forecast-gauge-labels">
+                <span>低风险</span>
+                <span>中风险</span>
+                <span>高风险</span>
+              </div>
+            </div>
+            <div v-if="forecastHistorySvg" class="forecast-history-card">
+              <svg
+                :viewBox="`0 0 ${forecastHistorySvg.width} ${forecastHistorySvg.height}`"
+                class="forecast-history-svg"
+                role="img"
+                aria-label="近期 FPI 历史与下一时间窗预测"
+              >
+                <rect x="0" y="0" :width="forecastHistorySvg.width" :height="forecastHistorySvg.height" rx="18" class="trend-bg" />
+                <line
+                  v-for="line in forecastHistorySvg.thresholdLines"
+                  :key="line.label"
+                  :x1="forecastHistorySvg.paddingLeft"
+                  :x2="forecastHistorySvg.widthInnerEnd"
+                  :y1="line.y"
+                  :y2="line.y"
+                  class="forecast-threshold-line"
+                />
+                <path :d="forecastHistorySvg.historyPath" class="forecast-history-line" />
+                <circle
+                  v-for="point in forecastHistorySvg.points"
+                  :key="point.label"
+                  :cx="point.x"
+                  :cy="point.y"
+                  r="4.5"
+                  class="forecast-history-dot"
+                />
+                <line
+                  :x1="forecastHistorySvg.lastHistoryPointX"
+                  :y1="forecastHistorySvg.lastHistoryPointY"
+                  :x2="forecastHistorySvg.forecastX"
+                  :y2="forecastHistorySvg.forecastY"
+                  class="forecast-projection-line"
+                />
+                <circle :cx="forecastHistorySvg.forecastX" :cy="forecastHistorySvg.forecastY" r="7" class="forecast-point-dot" />
+              </svg>
+              <div class="forecast-history-labels">
+                <span v-for="point in forecastHistorySvg.points" :key="point.label">{{ point.label }}</span>
+                <span>预测</span>
               </div>
             </div>
           </div>
@@ -578,6 +744,7 @@ watch(
             <span><i class="legend-swatch legend-swatch--speed"></i> 平均航速</span>
             <span><i class="legend-swatch legend-swatch--slow"></i> 低速比例</span>
           </div>
+          <p class="trend-note">{{ trendSummary }}</p>
         </div>
         <div v-else class="empty-state track-empty">
           {{ trendError || "当前没有可展示的趋势数据。" }}

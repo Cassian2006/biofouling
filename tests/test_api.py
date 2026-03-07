@@ -65,6 +65,7 @@ def test_vessel_detail_track_and_trend_endpoints_return_real_payloads() -> None:
     assert forecast_payload["raw_predicted_risk_label"] in {"low", "medium", "high"}
     assert forecast_payload["model_name"].startswith("fpi_lstm_")
     assert len(forecast_payload["signals"]) >= 1
+    assert len(forecast_payload["history_points"]) == 8
 
     assert report_response.status_code == 200
     assert report_response.json()["scope"] == "vessel"
