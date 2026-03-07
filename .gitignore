@@ -37,6 +37,7 @@ data/contracts/generated/*
 outputs/maps/*
 outputs/reports/*
 outputs/figures/*
+outputs/runtime_logs/
 !outputs/maps/.gitkeep
 !outputs/reports/.gitkeep
 !outputs/figures/.gitkeep
