@@ -34,6 +34,7 @@ const bounds = [
   [0.8, 102.9],
   [1.85, 104.9],
 ];
+const DISPLAY_SUBDIVISIONS = 4;
 
 const cellsByKey = computed(() =>
   new Map(props.cells.map((cell) => [`${cell.grid_lat}-${cell.grid_lon}`, cell])),
@@ -83,26 +84,20 @@ function toLeafletBounds(boundary) {
 
 function createDisplayBounds(cell, latStep, lonStep) {
   const { latMin, latMax, lonMin, lonMax } = getCellBounds(cell, latStep, lonStep);
-  const latMid = (latMin + latMax) / 2;
-  const lonMid = (lonMin + lonMax) / 2;
-  return [
-    [
-      [latMin, lonMin],
-      [latMid, lonMid],
-    ],
-    [
-      [latMin, lonMid],
-      [latMid, lonMax],
-    ],
-    [
-      [latMid, lonMin],
-      [latMax, lonMid],
-    ],
-    [
-      [latMid, lonMid],
-      [latMax, lonMax],
-    ],
-  ];
+  const latSegment = (latMax - latMin) / DISPLAY_SUBDIVISIONS;
+  const lonSegment = (lonMax - lonMin) / DISPLAY_SUBDIVISIONS;
+  const boundsCollection = [];
+
+  for (let latIndex = 0; latIndex < DISPLAY_SUBDIVISIONS; latIndex += 1) {
+    for (let lonIndex = 0; lonIndex < DISPLAY_SUBDIVISIONS; lonIndex += 1) {
+      boundsCollection.push([
+        [latMin + latSegment * latIndex, lonMin + lonSegment * lonIndex],
+        [latMin + latSegment * (latIndex + 1), lonMin + lonSegment * (lonIndex + 1)],
+      ]);
+    }
+  }
+
+  return boundsCollection;
 }
 
 function renderMap() {
