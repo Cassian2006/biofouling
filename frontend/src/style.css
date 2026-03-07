@@ -842,6 +842,71 @@ img {
   padding-bottom: 10px;
 }
 
+.forecast-card {
+  padding: 24px;
+}
+
+.forecast-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.forecast-score-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.forecast-label {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.forecast-score {
+  font-size: clamp(26px, 4vw, 40px);
+  line-height: 1;
+  color: var(--ink);
+}
+
+.forecast-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.signal-chip-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.signal-chip {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.signal-chip strong,
+.signal-chip span,
+.signal-chip small {
+  display: block;
+}
+
+.signal-chip span {
+  margin-top: 6px;
+  color: var(--muted);
+}
+
+.signal-chip small {
+  margin-top: 6px;
+  color: #6a6259;
+  line-height: 1.5;
+}
+
 .image-card img {
   border-radius: 16px;
 }
@@ -868,6 +933,11 @@ img {
   }
 
   .layer-switch-card {
+    grid-template-columns: 1fr;
+  }
+
+  .forecast-score-row,
+  .forecast-meta-grid {
     grid-template-columns: 1fr;
   }
 

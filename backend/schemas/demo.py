@@ -164,6 +164,38 @@ class VesselTrendResponse(BaseModel):
     max_low_speed_ratio: float | None
 
 
+class ForecastSignal(BaseModel):
+    title: str
+    value: str
+    assessment: str
+    detail: str
+
+
+class VesselForecastResponse(BaseModel):
+    window_label: str
+    mmsi: str
+    history_start: str
+    history_end: str
+    forecast_window_start: str
+    forecast_window_end: str
+    predicted_fpi: float
+    predicted_risk_label: str
+    raw_predicted_risk_label: str
+    low_threshold: float
+    high_threshold: float
+    validation_rmse: float | None
+    validation_r2: float | None
+    raw_accuracy: float | None
+    calibrated_accuracy: float | None
+    confidence_band_low: float
+    confidence_band_high: float
+    confidence_level: str
+    model_name: str
+    history_windows: int
+    window_hours: int
+    signals: list[ForecastSignal]
+
+
 class RegionalStatsResponse(BaseModel):
     window_label: str
     total_cells: int

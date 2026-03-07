@@ -31,6 +31,7 @@ def test_vessel_detail_track_and_trend_endpoints_return_real_payloads() -> None:
     detail_response = client.get("/api/demo/vessels/268240302")
     track_response = client.get("/api/demo/vessels/268240302/track")
     trend_response = client.get("/api/demo/vessels/268240302/trend")
+    forecast_response = client.get("/api/demo/vessels/268240302/forecast")
     report_response = client.get("/api/demo/reports/vessels/268240302")
 
     assert detail_response.status_code == 200
@@ -55,6 +56,15 @@ def test_vessel_detail_track_and_trend_endpoints_return_real_payloads() -> None:
     assert trend_payload["interval_hours"] == 6
     assert len(trend_payload["windows"]) == 11
     assert trend_payload["max_point_count"] == 119
+
+    forecast_payload = forecast_response.json()
+    assert forecast_response.status_code == 200
+    assert forecast_payload["mmsi"] == "268240302"
+    assert forecast_payload["predicted_fpi"] >= 0
+    assert forecast_payload["predicted_risk_label"] in {"low", "medium", "high"}
+    assert forecast_payload["raw_predicted_risk_label"] in {"low", "medium", "high"}
+    assert forecast_payload["model_name"].startswith("fpi_lstm_")
+    assert len(forecast_payload["signals"]) >= 1
 
     assert report_response.status_code == 200
     assert report_response.json()["scope"] == "vessel"

@@ -17,15 +17,18 @@ const {
   fetchVesselReportPreview,
   fetchVesselTrack,
   fetchVesselTrend,
+  fetchVesselForecast,
 } = useDemoData();
 
 const vesselDetail = ref(null);
 const vesselTrack = ref(null);
 const vesselTrend = ref(null);
+const vesselForecast = ref(null);
 const reportPreview = ref(null);
 const pageError = ref("");
 const trackError = ref("");
 const trendError = ref("");
+const forecastError = ref("");
 const selectedMmsi = ref("");
 
 const selectedVessel = computed(() => vesselDetail.value?.vessel || null);
@@ -33,6 +36,7 @@ const peerVessels = computed(() => vesselDetail.value?.peer_vessels || []);
 const staticProfile = computed(() => vesselDetail.value?.static_profile || null);
 const validationSummary = computed(() => vesselDetail.value?.validation_summary || null);
 const nearestReference = computed(() => vesselDetail.value?.nearest_reference || null);
+const forecastSignals = computed(() => vesselForecast.value?.signals || []);
 
 const vesselOptions = computed(() =>
   vessels.value.map((item) => ({
@@ -175,7 +179,10 @@ const validationFacts = computed(() => {
 
 const compactSummary = computed(() => {
   if (!selectedVessel.value || !vesselTrack.value) return "";
-  return `轨迹记录 ${vesselTrack.value.point_count} 点，时间跨度 ${selectedVessel.value.track_duration_hours} 小时，低速暴露比例 ${selectedVessel.value.low_speed_ratio ?? "暂无"}，建议为“${selectedVessel.value.recommendation}”。`;
+  const forecastSummary = vesselForecast.value
+    ? `下一时间窗预测 FPI ${vesselForecast.value.predicted_fpi}，预测等级 ${vesselForecast.value.predicted_risk_label}。`
+    : "";
+  return `轨迹记录 ${vesselTrack.value.point_count} 点，时间跨度 ${selectedVessel.value.track_duration_hours} 小时，低速暴露比例 ${selectedVessel.value.low_speed_ratio ?? "暂无"}，建议为“${selectedVessel.value.recommendation}”。${forecastSummary}`;
 });
 
 const svgTrend = computed(() => {
@@ -265,8 +272,10 @@ async function loadPageData() {
   pageError.value = "";
   trackError.value = "";
   trendError.value = "";
+  forecastError.value = "";
   vesselTrack.value = null;
   vesselTrend.value = null;
+  vesselForecast.value = null;
 
   try {
     await fetchDemoData();
@@ -289,6 +298,13 @@ async function loadPageData() {
       vesselTrend.value = await fetchVesselTrend(mmsi);
     } catch (trendLoadError) {
       trendError.value = trendLoadError instanceof Error ? trendLoadError.message : "趋势数据加载失败";
+    }
+
+    try {
+      vesselForecast.value = await fetchVesselForecast(mmsi);
+    } catch (forecastLoadError) {
+      forecastError.value =
+        forecastLoadError instanceof Error ? forecastLoadError.message : "预测数据加载失败";
     }
   } catch (errorObject) {
     pageError.value = errorObject instanceof Error ? errorObject.message : "单船详情加载失败";
@@ -354,6 +370,84 @@ watch(
           <strong>{{ selectedVessel.recommendation }}</strong>
         </div>
       </article>
+    </section>
+
+    <section class="content-section">
+      <div class="section-head">
+        <p class="section-kicker">Forecast</p>
+        <h3>
+          下一时间窗 FPI 预测
+          <HintTooltip text="预测基于最近 8 个 6 小时窗口的 AIS 行为序列与环境暴露序列，由当前最佳 LSTM 模型输出。页面展示的是校准后的风险等级口径。" />
+        </h3>
+      </div>
+      <div class="split-grid detail-layout">
+        <article class="page-card forecast-card">
+          <div v-if="vesselForecast" class="forecast-stack">
+            <div class="forecast-score-row">
+              <div>
+                <p class="forecast-label">预测 FPI</p>
+                <strong class="forecast-score">{{ vesselForecast.predicted_fpi }}</strong>
+              </div>
+              <div>
+                <p class="forecast-label">预测等级</p>
+                <strong class="forecast-score">{{ vesselForecast.predicted_risk_label }}</strong>
+              </div>
+            </div>
+            <div class="forecast-meta-grid">
+              <div class="summary-metric">
+                <span>预测窗口</span>
+                <strong>{{ vesselForecast.forecast_window_start }} → {{ vesselForecast.forecast_window_end }}</strong>
+              </div>
+              <div class="summary-metric">
+                <span>置信带</span>
+                <strong>{{ vesselForecast.confidence_band_low }} ~ {{ vesselForecast.confidence_band_high }}</strong>
+              </div>
+              <div class="summary-metric">
+                <span>模型校准准确率</span>
+                <strong>{{ vesselForecast.calibrated_accuracy ?? "暂无" }}</strong>
+              </div>
+              <div class="summary-metric">
+                <span>验证集 RMSE</span>
+                <strong>{{ vesselForecast.validation_rmse ?? "暂无" }}</strong>
+              </div>
+            </div>
+          </div>
+          <div v-else class="empty-state track-empty">
+            {{ forecastError || "当前没有可展示的预测结果。" }}
+          </div>
+        </article>
+
+        <article class="page-card list-card">
+          <div class="module-head">
+            <h4>预测解释</h4>
+          </div>
+          <div v-if="vesselForecast" class="list-row">
+            <div>
+              <strong>模型口径</strong>
+              <span>当前使用 {{ vesselForecast.model_name }}，最近 {{ vesselForecast.history_windows }} 个窗口预测未来 {{ vesselForecast.window_hours }} 小时。</span>
+            </div>
+          </div>
+          <div v-if="vesselForecast" class="list-row">
+            <div>
+              <strong>等级校准</strong>
+              <span>校准阈值为 low / medium {{ vesselForecast.low_threshold }}，medium / high {{ vesselForecast.high_threshold }}，用于改善前端标签判读。</span>
+            </div>
+          </div>
+          <div v-if="vesselForecast" class="signal-chip-list">
+            <div v-for="signal in forecastSignals" :key="signal.title" class="signal-chip">
+              <strong>{{ signal.title }}</strong>
+              <span>{{ signal.value }} · {{ signal.assessment }}</span>
+              <small>{{ signal.detail }}</small>
+            </div>
+          </div>
+          <div v-else class="list-row">
+            <div>
+              <strong>预测状态</strong>
+              <span>{{ forecastError || "预测模块尚未返回数据。" }}</span>
+            </div>
+          </div>
+        </article>
+      </div>
     </section>
 
     <section class="content-section">

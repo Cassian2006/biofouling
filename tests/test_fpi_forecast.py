@@ -2,6 +2,7 @@ import pandas as pd
 
 from scripts.fpi_forecast import (
     build_supervised_sequences,
+    build_latest_inference_sequences,
     build_window_feature_frame,
     sequence_feature_columns,
 )
@@ -75,3 +76,33 @@ def test_build_supervised_sequences_returns_flattened_training_rows() -> None:
     assert float(dataset.iloc[0]["t00_ping_count"]) == 8.0
     assert float(dataset.iloc[0]["t02_fpi_proxy"]) == 0.54
     assert len(sequence_feature_columns(dataset)) == 33
+
+
+def test_build_latest_inference_sequences_returns_latest_contiguous_history() -> None:
+    windows = pd.DataFrame(
+        {
+            "mmsi": ["111000111"] * 6,
+            "window_start": pd.date_range("2026-01-15T00:00:00Z", periods=6, freq="6h"),
+            "window_end": pd.date_range("2026-01-15T06:00:00Z", periods=6, freq="6h"),
+            "window_hours": [6] * 6,
+            "ping_count": [8, 9, 10, 11, 12, 13],
+            "coverage_ratio": [1.0, 1.0, 0.8, 1.0, 1.0, 0.9],
+            "mean_sog": [1.0, 1.2, 4.5, 5.0, 0.8, 0.7],
+            "max_sog": [1.5, 1.6, 6.0, 6.5, 1.2, 1.1],
+            "low_speed_ratio": [1.0, 0.9, 0.4, 0.3, 1.0, 1.0],
+            "mean_sst": [28.4, 28.1, 27.8, 27.6, 28.3, 28.5],
+            "mean_chlorophyll_a": [0.5, 0.45, 0.3, 0.25, 0.55, 0.58],
+            "mean_salinity": [31.1, 31.0, 30.9, 31.2, 31.1, 31.0],
+            "mean_current_u": [-0.3, -0.2, -0.1, -0.2, -0.3, -0.2],
+            "mean_current_v": [0.1, 0.0, -0.1, -0.2, 0.1, 0.2],
+            "fpi_proxy": [1.0, 0.935, 0.54, 0.495, 1.0, 0.965],
+            "risk_label": ["high", "high", "medium", "medium", "high", "high"],
+        }
+    )
+
+    dataset = build_latest_inference_sequences(windows, history_windows=4)
+
+    assert len(dataset) == 1
+    assert dataset.iloc[0]["forecast_window_start"] == "2026-01-16T12:00:00+00:00"
+    assert float(dataset.iloc[0]["t03_fpi_proxy"]) == 0.965
+    assert len(sequence_feature_columns(dataset)) == 44

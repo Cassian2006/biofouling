@@ -22,6 +22,10 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution fallba
     )
 
 
+DEFAULT_LOW_THRESHOLD = 0.4
+DEFAULT_HIGH_THRESHOLD = 0.7
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate a trained FPI LSTM model.")
     parser.add_argument("--dataset", required=True, help="Path to sequence dataset CSV.")
@@ -35,6 +39,18 @@ def parse_args() -> argparse.Namespace:
         help="Directory for evaluation outputs. Defaults to <model-dir>/evaluation.",
     )
     return parser.parse_args()
+
+
+def assign_risk_label_with_thresholds(
+    score: float,
+    low_threshold: float = DEFAULT_LOW_THRESHOLD,
+    high_threshold: float = DEFAULT_HIGH_THRESHOLD,
+) -> str:
+    if score >= high_threshold:
+        return "high"
+    if score >= low_threshold:
+        return "medium"
+    return "low"
 
 
 def infer_architecture_from_state_dict(state_dict: dict[str, object]) -> tuple[int, int]:
@@ -74,17 +90,83 @@ def compute_classification_metrics(
     for actual_label, predicted_label in zip(actual_labels, predicted_labels):
         confusion[actual_label][predicted_label] += 1
 
-    correct = sum(
-        confusion[label][label]
-        for label in labels
-    )
+    correct = sum(confusion[label][label] for label in labels)
     total = max(len(actual_labels), 1)
     accuracy = correct / total
+    recall_by_label: dict[str, float] = {}
+    precision_by_label: dict[str, float] = {}
+    f1_by_label: dict[str, float] = {}
+    for label in labels:
+        tp = confusion[label][label]
+        actual_total = sum(confusion[label].values())
+        predicted_total = sum(confusion[row][label] for row in labels)
+        recall = tp / actual_total if actual_total else 0.0
+        precision = tp / predicted_total if predicted_total else 0.0
+        f1 = 0.0 if recall + precision == 0 else (2 * recall * precision) / (recall + precision)
+        recall_by_label[label] = recall
+        precision_by_label[label] = precision
+        f1_by_label[label] = f1
+    balanced_accuracy = sum(recall_by_label.values()) / len(labels)
+    macro_f1 = sum(f1_by_label.values()) / len(labels)
     return {
         "accuracy": accuracy,
         "labels": labels,
         "confusion": confusion,
+        "recall_by_label": recall_by_label,
+        "precision_by_label": precision_by_label,
+        "f1_by_label": f1_by_label,
+        "balanced_accuracy": balanced_accuracy,
+        "macro_f1": macro_f1,
     }
+
+
+def optimize_label_thresholds(
+    actual_scores: np.ndarray,
+    predicted_scores: np.ndarray,
+    *,
+    objective: str = "macro_f1",
+    step: float = 0.01,
+) -> dict[str, object]:
+    actual_labels = [
+        assign_risk_label_with_thresholds(float(value), DEFAULT_LOW_THRESHOLD, DEFAULT_HIGH_THRESHOLD)
+        for value in actual_scores.tolist()
+    ]
+    best_result: dict[str, object] | None = None
+
+    low_values = np.arange(0.2, 0.66, step)
+    high_values = np.arange(0.45, 0.91, step)
+    for low_threshold in low_values:
+        for high_threshold in high_values:
+            low_threshold = round(float(low_threshold), 2)
+            high_threshold = round(float(high_threshold), 2)
+            if low_threshold >= high_threshold:
+                continue
+            predicted_labels = [
+                assign_risk_label_with_thresholds(float(value), low_threshold, high_threshold)
+                for value in predicted_scores.tolist()
+            ]
+            metrics = compute_classification_metrics(actual_labels, predicted_labels)
+            score = float(metrics.get(objective, 0.0))
+            tie_break = float(metrics["accuracy"])
+            candidate = {
+                "objective": objective,
+                "low_threshold": low_threshold,
+                "high_threshold": high_threshold,
+                "classification_metrics": metrics,
+                "score": score,
+                "tie_break_accuracy": tie_break,
+            }
+            if best_result is None:
+                best_result = candidate
+                continue
+            best_score = float(best_result["score"])
+            best_tie_break = float(best_result["tie_break_accuracy"])
+            if score > best_score or (math.isclose(score, best_score) and tie_break > best_tie_break):
+                best_result = candidate
+
+    if best_result is None:
+        raise ValueError("Unable to optimize label thresholds.")
+    return best_result
 
 
 def plot_loss_curve(history: list[dict[str, float]], output_path: Path) -> None:
@@ -183,6 +265,13 @@ def main() -> None:
     actual_labels = [assign_risk_label(float(value)) for value in val_y.tolist()]
     predicted_labels = [assign_risk_label(float(value)) for value in predictions.tolist()]
     classification_metrics = compute_classification_metrics(actual_labels, predicted_labels)
+    calibration = optimize_label_thresholds(val_y, predictions, objective="macro_f1")
+    calibrated_low_threshold = float(calibration["low_threshold"])
+    calibrated_high_threshold = float(calibration["high_threshold"])
+    calibrated_labels = [
+        assign_risk_label_with_thresholds(float(value), calibrated_low_threshold, calibrated_high_threshold)
+        for value in predictions.tolist()
+    ]
 
     predictions_frame = pd.DataFrame(
         {
@@ -190,6 +279,7 @@ def main() -> None:
             "predicted_fpi_proxy": predictions,
             "actual_risk_label": actual_labels,
             "predicted_risk_label": predicted_labels,
+            "calibrated_predicted_risk_label": calibrated_labels,
         }
     )
     predictions_frame.to_csv(output_dir / "validation_predictions.csv", index=False)
@@ -198,6 +288,12 @@ def main() -> None:
         "validation_rows": int(len(val_y)),
         "regression_metrics": regression_metrics,
         "classification_metrics": classification_metrics,
+        "label_calibration": {
+            "objective": str(calibration["objective"]),
+            "low_threshold": calibrated_low_threshold,
+            "high_threshold": calibrated_high_threshold,
+            "classification_metrics": calibration["classification_metrics"],
+        },
         "best_training_epoch": min(training_metrics["history"], key=lambda item: item["val_loss"]),
     }
     (output_dir / "evaluation.json").write_text(

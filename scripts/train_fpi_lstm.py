@@ -38,16 +38,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=12, help="Training epochs.")
     parser.add_argument("--batch-size", type=int, default=32, help="Training batch size.")
     parser.add_argument("--learning-rate", type=float, default=1e-3, help="Learning rate.")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducible training.")
     parser.add_argument(
         "--sampling-strategy",
         choices=["uniform", "balanced"],
-        default="balanced",
+        default="uniform",
         help="How to sample training rows across risk labels.",
     )
     parser.add_argument(
         "--loss-weighting",
         choices=["uniform", "balanced"],
-        default="balanced",
+        default="uniform",
         help="How to weight regression loss across risk labels.",
     )
     parser.add_argument(
@@ -143,6 +144,8 @@ def sample_weight_array(labels: list[str], weight_map: dict[str, float]) -> np.n
 def main() -> None:
     args = parse_args()
     torch, nn, DataLoader, TensorDataset, WeightedRandomSampler = require_torch()
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
 
     dataframe, features, targets, feature_columns = load_dataset(Path(args.dataset))
     train_x, train_y, val_x, val_y = split_by_vessel(dataframe, features, targets)
@@ -238,6 +241,7 @@ def main() -> None:
         "feature_columns": feature_columns,
         "hidden_size": int(args.hidden_size),
         "layers": int(args.layers),
+        "seed": int(args.seed),
         "label_set": sorted(set(risk_labels_from_targets(targets))),
         "sampling_strategy": args.sampling_strategy,
         "loss_weighting": args.loss_weighting,

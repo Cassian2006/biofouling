@@ -12,6 +12,7 @@ from backend.schemas.demo import (
     ReportPreviewResponse,
     RiskCellRecord,
     VesselDetailResponse,
+    VesselForecastResponse,
     VesselRecord,
     VesselTrendResponse,
     VesselTrackResponse,
@@ -29,6 +30,7 @@ from backend.services.demo_data import (
     get_vessel_trend,
     get_vessel_track,
 )
+from backend.services.forecast_data import get_vessel_forecast
 from backend.services.scoring import estimate_scores
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -121,6 +123,16 @@ def demo_vessel_trend(mmsi: str) -> VesselTrendResponse:
         return get_vessel_trend(mmsi)
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.get("/api/demo/vessels/{mmsi}/forecast", tags=["demo"], response_model=VesselForecastResponse)
+def demo_vessel_forecast(mmsi: str) -> VesselForecastResponse:
+    try:
+        return get_vessel_forecast(mmsi)
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (FileNotFoundError, RuntimeError) as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 @app.get("/api/demo/regional-stats", tags=["demo"], response_model=RegionalStatsResponse)

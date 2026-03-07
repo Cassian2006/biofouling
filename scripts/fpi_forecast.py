@@ -179,6 +179,56 @@ def build_supervised_sequences(
     return pd.DataFrame.from_records(records)
 
 
+def build_latest_inference_sequences(
+    window_features: pd.DataFrame,
+    *,
+    history_windows: int = 8,
+    feature_columns: list[str] | None = None,
+) -> pd.DataFrame:
+    if window_features.empty:
+        return pd.DataFrame()
+
+    feature_columns = feature_columns or WINDOW_BASE_FEATURES + ["fpi_proxy"]
+    data = window_features.sort_values(["mmsi", "window_start"]).reset_index(drop=True)
+    window_hours = int(data["window_hours"].iloc[0])
+    expected_delta = pd.to_timedelta(window_hours, unit="h")
+
+    records: list[dict[str, object]] = []
+    for mmsi, vessel_frame in data.groupby("mmsi", sort=False):
+        vessel_frame = vessel_frame.reset_index(drop=True)
+        if len(vessel_frame) < history_windows:
+            continue
+
+        for end_index in range(len(vessel_frame), history_windows - 1, -1):
+            history_frame = vessel_frame.iloc[end_index - history_windows : end_index]
+            diffs = history_frame["window_start"].diff().dropna()
+            if not diffs.eq(expected_delta).all():
+                continue
+
+            forecast_start = history_frame.iloc[-1]["window_end"]
+            forecast_end = forecast_start + pd.to_timedelta(window_hours, unit="h")
+            record: dict[str, object] = {
+                "sequence_id": f"{mmsi}_{history_frame.iloc[0]['window_start'].isoformat()}_forecast",
+                "mmsi": str(mmsi),
+                "history_start": history_frame.iloc[0]["window_start"].isoformat(),
+                "history_end": history_frame.iloc[-1]["window_end"].isoformat(),
+                "forecast_window_start": forecast_start.isoformat(),
+                "forecast_window_end": forecast_end.isoformat(),
+                "history_windows": history_windows,
+                "window_hours": window_hours,
+            }
+            for step_index, (_, row) in enumerate(history_frame.iterrows()):
+                for column in feature_columns:
+                    value = row.get(column, np.nan)
+                    record[f"t{step_index:02d}_{column}"] = (
+                        float(value) if pd.notna(value) else np.nan
+                    )
+            records.append(record)
+            break
+
+    return pd.DataFrame.from_records(records)
+
+
 def sequence_feature_columns(dataset: pd.DataFrame) -> list[str]:
     return [
         column

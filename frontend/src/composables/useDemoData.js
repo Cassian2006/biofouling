@@ -157,6 +157,11 @@ async function fetchVesselTrend(mmsi) {
   return fetchJson(buildApiUrl(`/api/demo/vessels/${mmsi}/trend`));
 }
 
+async function fetchVesselForecast(mmsi) {
+  await fetchDemoData();
+  return fetchJson(buildApiUrl(`/api/demo/vessels/${mmsi}/forecast`));
+}
+
 async function fetchRegionalStats() {
   await fetchDemoData();
   try {
@@ -208,6 +213,7 @@ export function useDemoData() {
     fetchVesselDetail,
     fetchVesselTrack,
     fetchVesselTrend,
+    fetchVesselForecast,
     fetchRegionalStats,
     fetchVesselReportPreview,
     fetchOverviewReportPreview,

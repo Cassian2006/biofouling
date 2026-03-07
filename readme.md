@@ -1387,3 +1387,47 @@ project/
 
 验证结果：
 - `pytest` 当前结果为 `24 passed`
+
+44. 1.5 预测标签校准与单船页接入已完成（2026-03-07）
+在首轮类别失衡调优之后，当前继续围绕“让预测结果真正可用”做了一轮收口，重点不是继续盲目重训，而是把最优基线模型正式接进产品页面。
+
+本轮完成：
+- 将训练脚本 `scripts/train_fpi_lstm.py` 的默认训练口径修回：
+  - `sampling_strategy = uniform`
+  - `loss_weighting = uniform`
+- 新增可复现训练种子参数：
+  - `--seed`
+- 为评估脚本 `scripts/evaluate_fpi_lstm.py` 新增风险等级阈值校准能力
+- 为后端新增单船预测接口：
+  - `/api/demo/vessels/{mmsi}/forecast`
+- 将预测结果接入单船详情页：
+  - `frontend/src/pages/VesselDetailPage.vue`
+
+当前阈值校准结果：
+- 默认阈值：`0.40 / 0.70`
+- 推荐阈值：`0.53 / 0.69`
+
+校准后验证集表现：
+- 原始 `risk_label_accuracy = 0.7821`
+- 校准后 `risk_label_accuracy = 0.8120`
+- 原始 `macro_f1 = 0.5647`
+- 校准后 `macro_f1 = 0.6137`
+
+当前单船页已可展示：
+- 下一时间窗预测 `FPI`
+- 校准后风险等级
+- 预测窗口范围
+- 预测置信带
+- 模型验证 `RMSE`
+- 校准后标签准确率
+- 近期主要驱动信号
+
+当前真实样例：
+- `MMSI 268240302`
+- `predicted_fpi = 0.8385`
+- `predicted_risk_label = high`
+- `confidence_level = medium`
+
+验证结果：
+- `pytest` 当前结果为 `26 passed`
+- 前端 `npm run build` 通过
