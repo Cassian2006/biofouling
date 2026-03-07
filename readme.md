@@ -1499,3 +1499,48 @@ project/
 验证结果：
 - `pytest` 当前结果为 `27 passed`
 - 前端 `npm run build` 通过
+
+48. 1.5 第二模块已启动：异常污损暴露检测（2026-03-07）
+当前已正式启动 `1.5` 的第二条主线：`异常污损暴露检测模块`。
+
+本轮已落地：
+- 特征与解释工具：
+  - `scripts/exposure_anomaly.py`
+- 训练脚本：
+  - `scripts/train_exposure_autoencoder.py`
+- 评估脚本：
+  - `scripts/evaluate_exposure_autoencoder.py`
+- 测试：
+  - `tests/test_exposure_anomaly.py`
+- 模块说明：
+  - `docs/exposure_anomaly_module.md`
+
+首版设计：
+- 输入使用当前船舶特征表中的行为与环境特征
+- 首版采用轻量 `Autoencoder`
+- 输出：
+  - `anomaly_score`
+  - `anomaly_level`
+  - 前三项异常驱动特征
+
+当前已在真实 `15 天` 样本上完成首版训练与评估：
+- 样本规模：`637` 艘船
+- 当前最佳验证损失：`0.3087`
+- 异常等级分布：
+  - `normal: 509`
+  - `suspicious: 96`
+  - `highly_abnormal: 32`
+
+当前 Top 异常对象包括：
+- `563215100`
+- `533052300`
+- `312653000`
+
+当前解释项示例包括：
+- `ping_count 高于模型重建值`
+- `current_speed 低于模型重建值`
+- `mean_sst 低于模型重建值`
+
+这意味着：
+- `1.5` 的第二条线已经从“想法”推进到“有真实训练、真实评分和解释输出”
+- 下一步可以开始把异常榜单与异常解释接入总览页和单船页
