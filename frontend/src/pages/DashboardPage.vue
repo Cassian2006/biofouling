@@ -25,9 +25,9 @@ const selectedHotspotKey = ref("");
 
 const layerOptions = [
   { key: "rri_score", title: "综合风险", shortLabel: "RRI" },
-  { key: "traffic_score", title: "船多不多", shortLabel: "船流" },
-  { key: "low_speed_score", title: "停得久不久", shortLabel: "停留" },
-  { key: "environment_score", title: "海水条件", shortLabel: "海水" },
+  { key: "traffic_score", title: "交通疏密", shortLabel: "交通" },
+  { key: "low_speed_score", title: "低速停留", shortLabel: "停留" },
+  { key: "environment_score", title: "水域情况", shortLabel: "水域" },
 ];
 
 const topVessels = computed(() => vessels.value.slice(0, 8));
@@ -55,9 +55,9 @@ const hotspotSummary = computed(() => {
   if (!cell) return [];
   return [
     { label: "综合风险", value: cell.rri_score },
-    { label: "船多不多", value: cell.traffic_score },
-    { label: "停得久不久", value: cell.low_speed_score },
-    { label: "海水条件", value: cell.environment_score },
+    { label: "交通疏密", value: cell.traffic_score },
+    { label: "低速停留", value: cell.low_speed_score },
+    { label: "水域情况", value: cell.environment_score },
   ];
 });
 
@@ -168,7 +168,7 @@ onMounted(async () => {
         <p class="section-kicker">Spatial View</p>
         <h3>
           区域主地图
-          <HintTooltip text="地图展示空间风险，以及某个区域到底是船多、停留久，还是海水条件更特殊。" />
+          <HintTooltip text="地图展示空间风险，以及某个区域到底是交通更密、停留更多，还是水域条件更特殊。" />
         </h3>
       </div>
       <div class="split-grid detail-layout dashboard-map-layout">
