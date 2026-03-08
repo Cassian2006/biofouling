@@ -12,6 +12,11 @@ from backend.schemas.demo import (
     VesselAnomalyResponse,
 )
 from backend.services.demo_data import PROCESSED_DIR, PROJECT_ROOT, _latest_file, _window_label_from_features
+from scripts.exposure_anomaly import (
+    ANOMALY_TYPE_LABELS,
+    build_anomaly_type_summary,
+    classify_anomaly_type,
+)
 
 
 MODELS_DIR = PROJECT_ROOT / "outputs" / "models"
@@ -138,7 +143,7 @@ def _build_summary_sentence(
     if not drivers:
         return f"该船当前被识别为{level}，但暂缺可解释的主导偏离项。"
 
-    level_label = "高度异常" if level == "highly_abnormal" else "可疑异常" if level == "suspicious" else "正常"
+    level_label = "高度异常" if level == "highly_abnormal" else "需复核" if level == "suspicious" else "正常"
     lead_labels = "、".join(driver.feature_label for driver in drivers[:2])
     trend_words = []
     for driver in drivers[:2]:
@@ -148,6 +153,13 @@ def _build_summary_sentence(
             trend_words.append(f"{driver.feature_label}偏低")
     trend_phrase = "，".join(trend_words) if trend_words else lead_labels
     return f"这艘船的主要问题在于 {trend_phrase}，其暴露模式在同批船舶中属于{level_label}。"
+
+
+def _anomaly_type_fields(row: pd.Series, cohort_frame: pd.DataFrame) -> tuple[str, str, str]:
+    anomaly_type = classify_anomaly_type(row, cohort_frame)
+    type_label = ANOMALY_TYPE_LABELS.get(anomaly_type, anomaly_type)
+    type_summary = build_anomaly_type_summary(row, cohort_frame, anomaly_type)
+    return anomaly_type, type_label, type_summary
 
 
 def _explanations_from_row(row: pd.Series) -> list[str]:
@@ -168,12 +180,16 @@ def _serialize_records(frame: pd.DataFrame, cohort_frame: pd.DataFrame) -> list[
             for value in [getattr(row, "explanation_1", ""), getattr(row, "explanation_2", ""), getattr(row, "explanation_3", "")]
             if str(value).strip()
         ]
+        anomaly_type, anomaly_type_label, anomaly_type_summary = _anomaly_type_fields(row_series, cohort_frame)
         records.append(
             VesselAnomalyRecord(
                 rank=rank,
                 mmsi=str(row.mmsi),
                 anomaly_score=round(float(row.anomaly_score), 6),
                 anomaly_level=str(row.anomaly_level),
+                anomaly_type=anomaly_type,
+                anomaly_type_label=anomaly_type_label,
+                anomaly_type_summary=anomaly_type_summary,
                 explanations=explanations,
                 summary_sentence=_build_summary_sentence(row_series, cohort_frame),
             )
@@ -195,6 +211,15 @@ def _load_anomaly_payload_by_signature(signature: tuple[str, ...]) -> dict[str, 
         .reindex(["highly_abnormal", "suspicious", "normal", "observation_insufficient"], fill_value=0)
         .to_dict()
     )
+    type_counts = (
+        anomaly_frame.apply(lambda row: classify_anomaly_type(row, anomaly_frame), axis=1)
+        .value_counts()
+        .reindex(
+            ["long_dwell_low_speed", "warm_productive_water", "mixed_anomaly", "sparse_observation"],
+            fill_value=0,
+        )
+        .to_dict()
+    )
     top_anomalies = _serialize_records(cohort_frame.head(12), cohort_frame)
     return {
         "window_label": window_label,
@@ -204,6 +229,7 @@ def _load_anomaly_payload_by_signature(signature: tuple[str, ...]) -> dict[str, 
             window_label=window_label,
             vessel_count=int(len(anomaly_frame)),
             anomaly_level_counts={str(key): int(value) for key, value in level_counts.items()},
+            anomaly_type_counts={str(key): int(value) for key, value in type_counts.items()},
             top_anomalies=top_anomalies,
         ),
     }
@@ -230,11 +256,15 @@ def get_vessel_anomaly_detail(mmsi: str) -> VesselAnomalyDetailResponse:
     percentile_rank = round(1 - ((rank - 1) / max(len(anomaly_frame) - 1, 1)), 4)
     peer_frame = cohort_frame.loc[cohort_frame["mmsi"] != str(mmsi)].head(6).reset_index(drop=True)
     driver_details = _build_driver_details(record, cohort_frame)
+    anomaly_type, anomaly_type_label, anomaly_type_summary = _anomaly_type_fields(record, cohort_frame)
     return VesselAnomalyDetailResponse(
         window_label=payload["window_label"],  # type: ignore[arg-type]
         mmsi=str(mmsi),
         anomaly_score=round(float(record["anomaly_score"]), 6),
         anomaly_level=str(record["anomaly_level"]),
+        anomaly_type=anomaly_type,
+        anomaly_type_label=anomaly_type_label,
+        anomaly_type_summary=anomaly_type_summary,
         percentile_rank=percentile_rank,
         summary_sentence=_build_summary_sentence(record, cohort_frame),
         explanations=_explanations_from_row(record),

@@ -14,22 +14,40 @@ const props = defineProps({
 });
 
 const mapElement = ref(null);
+const showTrackLine = ref(true);
+const showRecentSegment = ref(true);
+const showLowSpeedPoints = ref(true);
+const showReferencePoint = ref(true);
 let map;
 let tileLayer;
 let trackLayer;
+let recentTrackLayer;
+let lowSpeedLayer;
+let markerLayer;
+
+function fitToTrack() {
+  if (!map || !props.track?.points?.length) return;
+  const latLngs = props.track.points.map((point) => [point.latitude, point.longitude]);
+  map.fitBounds(L.latLngBounds(latLngs), { padding: [24, 24], maxZoom: 11 });
+}
 
 function renderTrack() {
-  if (!map || !trackLayer) return;
+  if (!map || !trackLayer || !recentTrackLayer || !lowSpeedLayer || !markerLayer) return;
   trackLayer.clearLayers();
+  recentTrackLayer.clearLayers();
+  lowSpeedLayer.clearLayers();
+  markerLayer.clearLayers();
 
   if (!props.track?.points?.length) return;
 
   const latLngs = props.track.points.map((point) => [point.latitude, point.longitude]);
-  L.polyline(latLngs, {
-    color: "#155e75",
-    weight: 4,
-    opacity: 0.95,
-  }).addTo(trackLayer);
+  if (showTrackLine.value) {
+    L.polyline(latLngs, {
+      color: "#155e75",
+      weight: 4,
+      opacity: 0.95,
+    }).addTo(trackLayer);
+  }
 
   const startPoint = props.track.points[0];
   const endPoint = props.track.points[props.track.points.length - 1];
@@ -42,7 +60,7 @@ function renderTrack() {
     fillOpacity: 1,
   })
     .bindTooltip("起点")
-    .addTo(trackLayer);
+    .addTo(markerLayer);
 
   L.circleMarker([endPoint.latitude, endPoint.longitude], {
     radius: 6,
@@ -52,22 +70,44 @@ function renderTrack() {
     fillOpacity: 1,
   })
     .bindTooltip("终点")
-    .addTo(trackLayer);
+    .addTo(markerLayer);
 
-  props.track.points
-    .filter((point) => point.is_low_speed)
-    .slice(0, 120)
-    .forEach((point) => {
-      L.circleMarker([point.latitude, point.longitude], {
-        radius: 3,
-        color: "rgba(255,255,255,0.7)",
-        weight: 1,
-        fillColor: "#b45309",
-        fillOpacity: 0.65,
-      }).addTo(trackLayer);
-    });
+  if (showRecentSegment.value) {
+    const endTime = new Date(endPoint.timestamp).getTime();
+    const recentPoints = props.track.points.filter((point) => endTime - new Date(point.timestamp).getTime() <= 24 * 3600 * 1000);
+    if (recentPoints.length >= 2) {
+      L.polyline(
+        recentPoints.map((point) => [point.latitude, point.longitude]),
+        {
+          color: "#c2410c",
+          weight: 5,
+          opacity: 0.75,
+          dashArray: "6 8",
+        },
+      )
+        .bindTooltip("近 24 小时轨迹")
+        .addTo(recentTrackLayer);
+    }
+  }
 
-  if (props.nearestReference) {
+  if (showLowSpeedPoints.value) {
+    props.track.points
+      .filter((point) => point.is_low_speed)
+      .slice(0, 160)
+      .forEach((point) => {
+        L.circleMarker([point.latitude, point.longitude], {
+          radius: 3,
+          color: "rgba(255,255,255,0.7)",
+          weight: 1,
+          fillColor: "#b45309",
+          fillOpacity: 0.65,
+        })
+          .bindTooltip(`低速点 · ${point.timestamp}${point.sog !== null ? ` · ${point.sog} 节` : ""}`)
+          .addTo(lowSpeedLayer);
+      });
+  }
+
+  if (props.nearestReference && showReferencePoint.value) {
     L.circleMarker([props.nearestReference.latitude, props.nearestReference.longitude], {
       radius: 5,
       color: "#ffffff",
@@ -76,10 +116,10 @@ function renderTrack() {
       fillOpacity: 0.9,
     })
       .bindTooltip(`${props.nearestReference.name} (${props.nearestReference.site_type})`)
-      .addTo(trackLayer);
+      .addTo(markerLayer);
   }
 
-  map.fitBounds(L.latLngBounds(latLngs), { padding: [24, 24], maxZoom: 11 });
+  fitToTrack();
 }
 
 onMounted(() => {
@@ -91,13 +131,17 @@ onMounted(() => {
     maxZoom: 18,
     attribution: "&copy; OpenStreetMap contributors",
   }).addTo(map);
+  L.control.scale({ imperial: false }).addTo(map);
   trackLayer = L.layerGroup().addTo(map);
+  recentTrackLayer = L.layerGroup().addTo(map);
+  lowSpeedLayer = L.layerGroup().addTo(map);
+  markerLayer = L.layerGroup().addTo(map);
   map.setView([1.25, 103.9], 8);
   renderTrack();
 });
 
 watch(
-  () => [props.track, props.nearestReference],
+  () => [props.track, props.nearestReference, showTrackLine.value, showRecentSegment.value, showLowSpeedPoints.value, showReferencePoint.value],
   () => {
     renderTrack();
   },
@@ -112,5 +156,26 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="mapElement" class="leaflet-map-stage leaflet-map-stage--track"></div>
+  <div class="track-map-shell">
+    <div class="map-toolbar">
+      <button type="button" class="map-toolbar__action" @click="fitToTrack">定位全轨迹</button>
+      <label class="map-toolbar__toggle">
+        <input v-model="showTrackLine" type="checkbox" />
+        <span>主轨迹</span>
+      </label>
+      <label class="map-toolbar__toggle">
+        <input v-model="showRecentSegment" type="checkbox" />
+        <span>近 24 小时</span>
+      </label>
+      <label class="map-toolbar__toggle">
+        <input v-model="showLowSpeedPoints" type="checkbox" />
+        <span>低速点</span>
+      </label>
+      <label class="map-toolbar__toggle">
+        <input v-model="showReferencePoint" type="checkbox" />
+        <span>参考点</span>
+      </label>
+    </div>
+    <div ref="mapElement" class="leaflet-map-stage leaflet-map-stage--track"></div>
+  </div>
 </template>

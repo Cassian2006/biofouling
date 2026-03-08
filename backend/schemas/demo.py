@@ -209,6 +209,9 @@ class VesselAnomalyRecord(BaseModel):
     mmsi: str
     anomaly_score: float
     anomaly_level: str
+    anomaly_type: str | None = None
+    anomaly_type_label: str | None = None
+    anomaly_type_summary: str | None = None
     explanations: list[str]
     summary_sentence: str | None = None
 
@@ -226,6 +229,7 @@ class VesselAnomalyResponse(BaseModel):
     window_label: str
     vessel_count: int
     anomaly_level_counts: dict[str, int]
+    anomaly_type_counts: dict[str, int]
     top_anomalies: list[VesselAnomalyRecord]
 
 
@@ -234,6 +238,9 @@ class VesselAnomalyDetailResponse(BaseModel):
     mmsi: str
     anomaly_score: float
     anomaly_level: str
+    anomaly_type: str
+    anomaly_type_label: str
+    anomaly_type_summary: str
     percentile_rank: float
     summary_sentence: str
     explanations: list[str]

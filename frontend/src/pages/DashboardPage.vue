@@ -34,6 +34,7 @@ const topVessels = computed(() => vessels.value.slice(0, 8));
 const referenceSites = computed(() => regionalStats.value?.reference_sites || []);
 const layerMeta = computed(() => layerOptions.find((item) => item.key === activeLayer.value) || layerOptions[0]);
 const anomalyCounts = computed(() => anomalySummary.value?.anomaly_level_counts || {});
+const anomalyTypeCounts = computed(() => anomalySummary.value?.anomaly_type_counts || {});
 const topAnomalies = computed(() => anomalySummary.value?.top_anomalies || []);
 
 const sortedCells = computed(() =>
@@ -288,6 +289,24 @@ onMounted(async () => {
           <p class="support-text anomaly-caption">
             观测不足对象不参与异常等级比较，避免短轨迹或低点数样本误占异常榜。
           </p>
+          <div class="signal-chip-list anomaly-type-grid">
+            <div class="signal-chip">
+              <strong>长时低速型</strong>
+              <span>{{ anomalyTypeCounts.long_dwell_low_speed || 0 }} 艘</span>
+            </div>
+            <div class="signal-chip">
+              <strong>高温高叶绿素型</strong>
+              <span>{{ anomalyTypeCounts.warm_productive_water || 0 }} 艘</span>
+            </div>
+            <div class="signal-chip">
+              <strong>混合异常型</strong>
+              <span>{{ anomalyTypeCounts.mixed_anomaly || 0 }} 艘</span>
+            </div>
+            <div class="signal-chip">
+              <strong>观测稀疏型</strong>
+              <span>{{ anomalyTypeCounts.sparse_observation || 0 }} 艘</span>
+            </div>
+          </div>
         </article>
 
         <article class="page-card list-card">
@@ -306,6 +325,7 @@ onMounted(async () => {
             <div>
               <strong>{{ item.mmsi }}</strong>
               <span>{{ item.summary_sentence || `${levelLabel(item.anomaly_level)} · ${item.explanations[0] || "异常驱动待补充"}` }}</span>
+              <span>{{ item.anomaly_type_label || "异常类型待识别" }}</span>
             </div>
             <div class="list-metric">
               <div>#{{ item.rank }}</div>

@@ -19,6 +19,25 @@ ANOMALY_FEATURE_COLUMNS = [
     "ecp_proxy",
 ]
 
+ANOMALY_TYPE_SPARSE = "sparse_observation"
+ANOMALY_TYPE_LONG_LOW_SPEED = "long_dwell_low_speed"
+ANOMALY_TYPE_WARM_PRODUCTIVE = "warm_productive_water"
+ANOMALY_TYPE_MIXED = "mixed_anomaly"
+
+ANOMALY_TYPE_LABELS = {
+    ANOMALY_TYPE_SPARSE: "观测稀疏型",
+    ANOMALY_TYPE_LONG_LOW_SPEED: "长时低速型",
+    ANOMALY_TYPE_WARM_PRODUCTIVE: "高温高叶绿素型",
+    ANOMALY_TYPE_MIXED: "混合异常型",
+}
+
+
+def _safe_float(value: object, default: float = 0.0) -> float:
+    numeric = pd.to_numeric(value, errors="coerce")
+    if pd.isna(numeric):
+        return default
+    return float(numeric)
+
 MIN_OBSERVATION_PINGS = 50
 MIN_OBSERVATION_HOURS = 12.0
 SUSPICIOUS_SCORE_THRESHOLD = 0.12
@@ -138,6 +157,49 @@ def classify_anomaly_levels(
             labels.append("normal")
 
     return pd.Series(labels, index=scores.index)
+
+
+def classify_anomaly_type(
+    row: pd.Series,
+    cohort_frame: pd.DataFrame,
+) -> str:
+    ping_count = _safe_float(row.get("ping_count"))
+    duration_hours = _safe_float(row.get("track_duration_hours"))
+    if ping_count < MIN_OBSERVATION_PINGS or duration_hours < MIN_OBSERVATION_HOURS:
+        return ANOMALY_TYPE_SPARSE
+
+    if cohort_frame.empty:
+        return ANOMALY_TYPE_MIXED
+
+    low_speed_threshold = float(cohort_frame["low_speed_ratio"].quantile(0.75))
+    duration_threshold = float(cohort_frame["track_duration_hours"].quantile(0.75))
+    sst_threshold = float(cohort_frame["mean_sst"].quantile(0.75))
+    chlorophyll_threshold = float(cohort_frame["mean_chlorophyll_a"].quantile(0.75))
+
+    low_speed_ratio = _safe_float(row.get("low_speed_ratio"))
+    mean_sst = _safe_float(row.get("mean_sst"))
+    mean_chlorophyll = _safe_float(row.get("mean_chlorophyll_a"))
+
+    if low_speed_ratio >= low_speed_threshold and duration_hours >= duration_threshold:
+        return ANOMALY_TYPE_LONG_LOW_SPEED
+    if mean_sst >= sst_threshold and mean_chlorophyll >= chlorophyll_threshold:
+        return ANOMALY_TYPE_WARM_PRODUCTIVE
+    return ANOMALY_TYPE_MIXED
+
+
+def build_anomaly_type_summary(
+    row: pd.Series,
+    cohort_frame: pd.DataFrame,
+    anomaly_type: str | None = None,
+) -> str:
+    resolved_type = anomaly_type or classify_anomaly_type(row, cohort_frame)
+    if resolved_type == ANOMALY_TYPE_SPARSE:
+        return "当前轨迹点数或覆盖时长不足，异常判断主要受观测充分性限制。"
+    if resolved_type == ANOMALY_TYPE_LONG_LOW_SPEED:
+        return "该船在较长时间内维持低速或停留状态，属于以行为暴露为主的异常模式。"
+    if resolved_type == ANOMALY_TYPE_WARM_PRODUCTIVE:
+        return "该船长期处于较高海温与较高叶绿素环境，属于以环境暴露为主的异常模式。"
+    return "该船同时存在多项偏离信号，异常来源并非单一因素。"
 
 
 def explain_anomaly_row(

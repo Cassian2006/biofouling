@@ -211,6 +211,47 @@ const anomalyHeadline = computed(() => {
   };
 });
 
+const vesselStory = computed(() => {
+  const historyTitle = vesselTrend.value
+    ? `${vesselTrend.value.windows.length} 个分窗的历史轨迹`
+    : selectedVessel.value
+      ? `${selectedVessel.value.track_duration_hours} 小时历史窗口`
+      : "历史窗口";
+  const historyDescription = vesselTrend.value
+    ? trendSummary.value
+    : "当前尚未加载到可用于判读的历史趋势。";
+
+  const currentTitle = selectedVessel.value?.recommendation || "当前状态";
+  const currentDescription = vesselAnomaly.value
+    ? `${vesselAnomaly.value.anomaly_type_label} · ${vesselAnomaly.value.anomaly_type_summary}`
+    : "当前状态以规则链路和观测结果为主。";
+
+  const forecastTitle = forecastAvailable.value
+    ? `${vesselForecast.value.predicted_risk_label} 风险`
+    : "预测暂不可用";
+  const forecastDescription = forecastAvailable.value
+    ? `下一时间窗预测 FPI 为 ${vesselForecast.value.predicted_fpi}，窗口为 ${vesselForecast.value.forecast_window_start} -> ${vesselForecast.value.forecast_window_end}。`
+    : vesselForecast.value?.unavailable_reason || "当前对象暂未生成连续预测结果。";
+
+  return [
+    {
+      kicker: "历史",
+      title: historyTitle,
+      description: historyDescription,
+    },
+    {
+      kicker: "当前",
+      title: currentTitle,
+      description: currentDescription,
+    },
+    {
+      kicker: "预测",
+      title: forecastTitle,
+      description: forecastDescription,
+    },
+  ];
+});
+
 const forecastGauge = computed(() => {
   if (!vesselForecast.value || !forecastAvailable.value) return null;
   const totalWidth = 100;
@@ -503,6 +544,23 @@ watch(
 
     <section class="content-section">
       <div class="section-head">
+        <p class="section-kicker">Storyline</p>
+        <h3>
+          历史-当前-预测链路
+          <HintTooltip text="用同一页串联历史行为证据、当前异常状态和下一时间窗预测结果。" />
+        </h3>
+      </div>
+      <div class="storyline-grid">
+        <article v-for="item in vesselStory" :key="item.kicker" class="page-card storyline-card">
+          <p class="section-kicker">{{ item.kicker }}</p>
+          <h4>{{ item.title }}</h4>
+          <p>{{ item.description }}</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="content-section">
+      <div class="section-head">
         <p class="section-kicker">Anomaly</p>
         <h3>
           异常暴露解释
@@ -523,6 +581,16 @@ watch(
             <div class="summary-metric">
               <span>分位位置</span>
               <strong>前 {{ anomalyHeadline?.percentile }}</strong>
+            </div>
+            <div class="summary-metric">
+              <span>异常类型</span>
+              <strong>{{ vesselAnomaly.anomaly_type_label }}</strong>
+            </div>
+          </div>
+          <div v-if="vesselAnomaly?.anomaly_type_summary" class="list-row">
+            <div>
+              <strong>类型说明</strong>
+              <span>{{ vesselAnomaly.anomaly_type_summary }}</span>
             </div>
           </div>
           <div v-if="vesselAnomaly?.summary_sentence" class="list-row">
@@ -566,7 +634,7 @@ watch(
           >
             <div>
               <strong>{{ item.mmsi }}</strong>
-              <span>{{ anomalyLevelLabel(item.anomaly_level) }} · {{ item.explanations[0] || "异常驱动待补充" }}</span>
+              <span>{{ item.anomaly_type_label || anomalyLevelLabel(item.anomaly_level) }} · {{ item.explanations[0] || "异常驱动待补充" }}</span>
             </div>
             <div class="list-metric">
               <div>#{{ item.rank }}</div>
@@ -748,6 +816,12 @@ watch(
         <article class="page-card list-card">
           <div class="module-head">
             <h4>轨迹说明</h4>
+          </div>
+          <div class="list-row">
+            <div>
+              <strong>交互开关</strong>
+              <span>可切换主轨迹、近 24 小时轨迹、低速点和参考点，并可一键回到全轨迹视角。</span>
+            </div>
           </div>
           <div class="list-row">
             <div>

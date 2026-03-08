@@ -1,11 +1,18 @@
 import pandas as pd
 
 from scripts.exposure_anomaly import (
+    ANOMALY_TYPE_LABELS,
+    ANOMALY_TYPE_LONG_LOW_SPEED,
+    ANOMALY_TYPE_MIXED,
+    ANOMALY_TYPE_SPARSE,
+    ANOMALY_TYPE_WARM_PRODUCTIVE,
     ANOMALY_FEATURE_COLUMNS,
     HIGHLY_ABNORMAL_SCORE_THRESHOLD,
     MIN_OBSERVATION_HOURS,
     MIN_OBSERVATION_PINGS,
     SUSPICIOUS_SCORE_THRESHOLD,
+    build_anomaly_type_summary,
+    classify_anomaly_type,
     classify_anomaly_levels,
     explain_anomaly_row,
     fit_scaler,
@@ -95,3 +102,26 @@ def test_split_train_validation_keeps_rows() -> None:
     assert len(train) + len(validation) == len(prepared)
     assert not train.empty
     assert not validation.empty
+
+
+def test_classify_anomaly_type_returns_expected_categories() -> None:
+    prepared = prepare_anomaly_features(sample_feature_frame())
+    sparse_row = prepared.iloc[0].copy()
+    sparse_row["ping_count"] = MIN_OBSERVATION_PINGS - 2
+    sparse_row["track_duration_hours"] = MIN_OBSERVATION_HOURS - 1
+
+    long_low_row = prepared.iloc[3].copy()
+    warm_row = prepared.iloc[1].copy()
+    warm_row["mean_sst"] = 29.2
+    warm_row["mean_chlorophyll_a"] = 0.9
+    warm_row["low_speed_ratio"] = 0.35
+    warm_row["track_duration_hours"] = 18
+
+    mixed_row = prepared.iloc[2].copy()
+
+    assert classify_anomaly_type(sparse_row, prepared) == ANOMALY_TYPE_SPARSE
+    assert classify_anomaly_type(long_low_row, prepared) == ANOMALY_TYPE_LONG_LOW_SPEED
+    assert classify_anomaly_type(warm_row, prepared) == ANOMALY_TYPE_WARM_PRODUCTIVE
+    assert classify_anomaly_type(mixed_row, prepared) == ANOMALY_TYPE_MIXED
+    assert ANOMALY_TYPE_LABELS[ANOMALY_TYPE_LONG_LOW_SPEED] == "长时低速型"
+    assert "环境暴露为主" in build_anomaly_type_summary(warm_row, prepared, ANOMALY_TYPE_WARM_PRODUCTIVE)

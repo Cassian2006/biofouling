@@ -503,6 +503,26 @@ img {
   color: var(--ink);
 }
 
+.storyline-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.storyline-card {
+  padding: 22px;
+}
+
+.storyline-card h4 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.storyline-card p:last-child {
+  margin: 12px 0 0;
+}
+
 .dashboard-map-layout {
   grid-template-columns: 1.5fr 0.9fr;
 }
@@ -525,6 +545,45 @@ img {
 
 .leaflet-map-stage--track {
   height: 520px;
+}
+
+.track-map-shell {
+  position: relative;
+}
+
+.map-toolbar {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 500;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: calc(100% - 32px);
+}
+
+.map-toolbar__action,
+.map-toolbar__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(29, 26, 22, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  color: var(--ink);
+  backdrop-filter: blur(8px);
+}
+
+.map-toolbar__action {
+  cursor: pointer;
+  font: inherit;
+}
+
+.map-toolbar__toggle input {
+  margin: 0;
 }
 
 .leaflet-map-stage .leaflet-control-attribution,
@@ -995,6 +1054,10 @@ img {
   margin-top: 12px;
 }
 
+.anomaly-type-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .signal-chip {
   padding: 14px 16px;
   border-radius: 16px;
@@ -1093,7 +1156,8 @@ img {
   .hero-grid,
   .stats-grid,
   .card-grid,
-  .split-grid {
+  .split-grid,
+  .storyline-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1108,7 +1172,8 @@ img {
   .forecast-score-row,
   .forecast-meta-grid,
   .anomaly-chip-row,
-  .anomaly-overview-grid {
+  .anomaly-overview-grid,
+  .anomaly-type-grid {
     grid-template-columns: 1fr;
   }
 
