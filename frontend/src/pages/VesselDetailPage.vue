@@ -63,7 +63,7 @@ function buildAssessment(values, value) {
 
 function anomalyLevelLabel(level) {
   if (level === "highly_abnormal") return "高度异常";
-  if (level === "suspicious") return "可疑异常";
+  if (level === "suspicious") return "需复核";
   if (level === "observation_insufficient") return "观测不足";
   return "正常";
 }
@@ -297,7 +297,7 @@ const trendSummary = computed(() => {
   const speedMin = Math.min(...meanSogValues);
   const speedMax = Math.max(...meanSogValues);
   if (allLowSpeed) {
-    return `当前这艘船在所含 ${vesselTrend.value.windows.length} 个分窗内均处于低速状态，因此低速比例曲线会稳定贴近上边界。`;
+    return `该船在所含 ${vesselTrend.value.windows.length} 个分窗内均处于低速状态，因此低速比例曲线会持续接近上边界。`;
   }
   return `当前分窗内平均航速范围 ${speedMin.toFixed(3)} ~ ${speedMax.toFixed(3)} 节，低速比例按动态坐标轴展示。`;
 });
@@ -527,7 +527,7 @@ watch(
           </div>
           <div v-if="vesselAnomaly?.summary_sentence" class="list-row">
             <div>
-              <strong>一句话判断</strong>
+              <strong>简要结论</strong>
               <span>{{ vesselAnomaly.summary_sentence }}</span>
             </div>
           </div>

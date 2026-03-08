@@ -41,10 +41,12 @@ def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
     assert "水域情况" in dashboard
     assert "异常暴露筛查" in dashboard
     assert "异常船舶榜单" in dashboard
+    assert "最高优先级船舶" in dashboard
+    assert "需复核" in dashboard
 
     assert "VesselTrackMap" in vessel
     assert "selector-input" in vessel
-    assert "一句话判断" in vessel
+    assert "简要结论" in vessel
 
     assert 'redirect: "/"' in router
     assert 'to="/regional-risk"' not in app_shell

@@ -78,7 +78,7 @@ function selectHotspot(keyOrCell) {
 
 function levelLabel(level) {
   if (level === "highly_abnormal") return "高度异常";
-  if (level === "suspicious") return "可疑异常";
+  if (level === "suspicious") return "需复核";
   if (level === "observation_insufficient") return "观测不足";
   return "正常";
 }
@@ -132,8 +132,8 @@ onMounted(async () => {
         </div>
         <div class="summary-metric">
           <span>
-            当前重点船舶
-            <HintTooltip text="指当前样本中综合风险排序最高的船舶对象。" />
+            最高优先级船舶
+            <HintTooltip text="指当前样本中综合风险排序最高、建议优先审阅的船舶对象。" />
           </span>
           <strong>{{ summary.top_vessel.mmsi }}</strong>
         </div>
@@ -168,7 +168,7 @@ onMounted(async () => {
         <p class="section-kicker">Spatial View</p>
         <h3>
           区域主地图
-          <HintTooltip text="地图展示空间风险，以及某个区域到底是交通更密、停留更多，还是水域条件更特殊。" />
+          <HintTooltip text="地图用于识别空间风险，并区分热点主要由交通疏密、低速停留或水域情况驱动。" />
         </h3>
       </div>
       <div class="split-grid detail-layout dashboard-map-layout">
@@ -259,7 +259,7 @@ onMounted(async () => {
         <p class="section-kicker">Anomaly</p>
         <h3>
           异常暴露筛查
-          <HintTooltip text="用于快速找出哪艘船的暴露模式明显不正常。" />
+          <HintTooltip text="用于识别暴露模式显著偏离样本基线的船舶对象。" />
         </h3>
       </div>
       <div class="split-grid detail-layout">
@@ -274,7 +274,7 @@ onMounted(async () => {
             </div>
             <div class="anomaly-chip anomaly-chip--warn">
               <strong>{{ anomalyCounts.suspicious || 0 }}</strong>
-              <span>可疑异常</span>
+              <span>需复核</span>
             </div>
             <div class="anomaly-chip anomaly-chip--calm">
               <strong>{{ anomalyCounts.normal || 0 }}</strong>
@@ -294,7 +294,7 @@ onMounted(async () => {
           <div class="module-head">
             <h4>
               异常船舶榜单
-              <HintTooltip text="点击后进入单船页，可继续查看一句话结论、详细偏离项和轨迹表现。" />
+              <HintTooltip text="点击后进入单船页，可继续查看简要结论、主要偏离项与轨迹表现。" />
             </h4>
           </div>
           <RouterLink
