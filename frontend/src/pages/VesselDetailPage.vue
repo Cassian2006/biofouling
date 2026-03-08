@@ -44,6 +44,7 @@ const forecastSignals = computed(() => vesselForecast.value?.signals || []);
 const forecastHistoryPoints = computed(() => vesselForecast.value?.history_points || []);
 const forecastAvailable = computed(() => Boolean(vesselForecast.value?.available));
 const anomalyPeers = computed(() => vesselAnomaly.value?.peer_anomalies || []);
+const focusAnomalyType = computed(() => (route.query.anomalyType ? String(route.query.anomalyType) : ""));
 
 const vesselOptions = computed(() =>
   vessels.value.map((item) => ({
@@ -67,6 +68,14 @@ function anomalyLevelLabel(level) {
   if (level === "suspicious") return "需复核";
   if (level === "observation_insufficient") return "观测不足";
   return "正常";
+}
+
+function anomalyTypeLabel(type) {
+  if (type === "long_dwell_low_speed") return "长时低速型";
+  if (type === "warm_productive_water") return "高温高叶绿素型";
+  if (type === "mixed_anomaly") return "混合异常型";
+  if (type === "sparse_observation") return "观测稀疏型";
+  return type || "异常类型";
 }
 
 const vesselFacts = computed(() => {
@@ -269,6 +278,14 @@ const vesselStory = computed(() => {
       description: forecastDescription,
     },
   ];
+});
+
+const focusTypeHint = computed(() => {
+  if (!focusAnomalyType.value || !vesselAnomaly.value) return null;
+  const sameType = vesselAnomaly.value.anomaly_type === focusAnomalyType.value;
+  return sameType
+    ? `当前页面从“${vesselAnomaly.value.anomaly_type_label}”视角进入，当前对象与所选类型一致。`
+    : `当前页面从异常类型切片进入；所选类型为“${anomalyTypeLabel(focusAnomalyType.value)}”，当前对象实际属于“${vesselAnomaly.value.anomaly_type_label}”。`;
 });
 
 const forecastGauge = computed(() => {
@@ -568,6 +585,10 @@ watch(
           <strong>{{ selectedVessel.recommendation }}</strong>
         </div>
       </article>
+    </section>
+
+    <section v-if="focusTypeHint" class="page-card compact-note-card">
+      <p>{{ focusTypeHint }}</p>
     </section>
 
     <section class="content-section">

@@ -22,6 +22,7 @@ const overviewReport = ref(null);
 const anomalySummary = ref(null);
 const activeLayer = ref("rri_score");
 const selectedHotspotKey = ref("");
+const activeAnomalyType = ref("all");
 
 const layerOptions = [
   { key: "rri_score", title: "综合风险", shortLabel: "RRI" },
@@ -37,6 +38,14 @@ const anomalyCounts = computed(() => anomalySummary.value?.anomaly_level_counts 
 const anomalyTypeCounts = computed(() => anomalySummary.value?.anomaly_type_counts || {});
 const anomalyTypeProfiles = computed(() => anomalySummary.value?.anomaly_type_profiles || []);
 const topAnomalies = computed(() => anomalySummary.value?.top_anomalies || []);
+const filteredAnomalies = computed(() => {
+  if (activeAnomalyType.value === "all") return topAnomalies.value;
+  return topAnomalies.value.filter((item) => item.anomaly_type === activeAnomalyType.value);
+});
+const activeAnomalyProfile = computed(() => {
+  if (activeAnomalyType.value === "all") return null;
+  return anomalyTypeProfiles.value.find((item) => item.anomaly_type === activeAnomalyType.value) || null;
+});
 
 const sortedCells = computed(() =>
   [...riskCells.value]
@@ -83,6 +92,16 @@ function levelLabel(level) {
   if (level === "suspicious") return "需复核";
   if (level === "observation_insufficient") return "观测不足";
   return "正常";
+}
+
+function selectAnomalyType(typeKey) {
+  activeAnomalyType.value = activeAnomalyType.value === typeKey ? "all" : typeKey;
+}
+
+function vesselLinkTarget(mmsi) {
+  return activeAnomalyType.value === "all"
+    ? `/vessels/${mmsi}`
+    : { path: `/vessels/${mmsi}`, query: { anomalyType: activeAnomalyType.value } };
 }
 
 onMounted(async () => {
@@ -291,22 +310,22 @@ onMounted(async () => {
             观测不足对象不参与异常等级比较，避免短轨迹或低点数样本误占异常榜。
           </p>
           <div class="signal-chip-list anomaly-type-grid">
-            <div class="signal-chip">
+            <button type="button" class="signal-chip signal-chip--button" :class="{ active: activeAnomalyType === 'long_dwell_low_speed' }" @click="selectAnomalyType('long_dwell_low_speed')">
               <strong>长时低速型</strong>
               <span>{{ anomalyTypeCounts.long_dwell_low_speed || 0 }} 艘</span>
-            </div>
-            <div class="signal-chip">
+            </button>
+            <button type="button" class="signal-chip signal-chip--button" :class="{ active: activeAnomalyType === 'warm_productive_water' }" @click="selectAnomalyType('warm_productive_water')">
               <strong>高温高叶绿素型</strong>
               <span>{{ anomalyTypeCounts.warm_productive_water || 0 }} 艘</span>
-            </div>
-            <div class="signal-chip">
+            </button>
+            <button type="button" class="signal-chip signal-chip--button" :class="{ active: activeAnomalyType === 'mixed_anomaly' }" @click="selectAnomalyType('mixed_anomaly')">
               <strong>混合异常型</strong>
               <span>{{ anomalyTypeCounts.mixed_anomaly || 0 }} 艘</span>
-            </div>
-            <div class="signal-chip">
+            </button>
+            <button type="button" class="signal-chip signal-chip--button" :class="{ active: activeAnomalyType === 'sparse_observation' }" @click="selectAnomalyType('sparse_observation')">
               <strong>观测稀疏型</strong>
               <span>{{ anomalyTypeCounts.sparse_observation || 0 }} 艘</span>
-            </div>
+            </button>
           </div>
         </article>
 
@@ -316,12 +335,19 @@ onMounted(async () => {
               异常船舶榜单
               <HintTooltip text="点击后进入单船页，可继续查看简要结论、主要偏离项与轨迹表现。" />
             </h4>
+            <span v-if="activeAnomalyProfile" class="status-pill">{{ activeAnomalyProfile.anomaly_type_label }}</span>
+          </div>
+          <div v-if="activeAnomalyProfile" class="list-row">
+            <div>
+              <strong>当前切片</strong>
+              <span>{{ activeAnomalyProfile.summary }}</span>
+            </div>
           </div>
           <RouterLink
-            v-for="item in topAnomalies"
+            v-for="item in filteredAnomalies"
             :key="item.mmsi"
             class="list-row link-row"
-            :to="`/vessels/${item.mmsi}`"
+            :to="vesselLinkTarget(item.mmsi)"
           >
             <div>
               <strong>{{ item.mmsi }}</strong>
@@ -333,6 +359,12 @@ onMounted(async () => {
               <div>Score {{ item.anomaly_score }}</div>
             </div>
           </RouterLink>
+          <div v-if="!filteredAnomalies.length" class="list-row">
+            <div>
+              <strong>当前切片暂无对象</strong>
+              <span>可以切换到其他异常类型，或再次点击当前标签返回全部对象。</span>
+            </div>
+          </div>
         </article>
       </div>
     </section>
@@ -346,7 +378,13 @@ onMounted(async () => {
         </h3>
       </div>
       <div class="card-grid anomaly-profile-grid">
-        <article v-for="profile in anomalyTypeProfiles" :key="profile.anomaly_type" class="page-card module-card">
+        <article
+          v-for="profile in anomalyTypeProfiles"
+          :key="profile.anomaly_type"
+          class="page-card module-card anomaly-profile-card"
+          :class="{ active: activeAnomalyType === profile.anomaly_type }"
+          @click="selectAnomalyType(profile.anomaly_type)"
+        >
           <div class="module-head">
             <h4>{{ profile.anomaly_type_label }}</h4>
             <span class="status-pill">{{ profile.vessel_count }} 艘</span>

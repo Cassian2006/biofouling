@@ -46,6 +46,8 @@ def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
     assert "长时低速型" in dashboard
     assert "观测稀疏型" in dashboard
     assert "异常类型对比" in dashboard
+    assert "当前切片" in dashboard
+    assert "anomalyType" in dashboard
 
     assert "VesselTrackMap" in vessel
     assert "selector-input" in vessel
@@ -54,6 +56,7 @@ def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
     assert "主导证据" in vessel
     assert "联动时间窗" in vessel
     assert "清除联动" in vessel
+    assert "当前页面从" in vessel
     assert "定位全轨迹" in read_text("frontend/src/components/VesselTrackMap.vue")
 
     assert 'redirect: "/"' in router
