@@ -33,6 +33,7 @@ const trendError = ref("");
 const forecastError = ref("");
 const anomalyError = ref("");
 const selectedMmsi = ref("");
+const selectedTrendWindowIndex = ref(null);
 
 const selectedVessel = computed(() => vesselDetail.value?.vessel || null);
 const peerVessels = computed(() => vesselDetail.value?.peer_vessels || []);
@@ -211,6 +212,24 @@ const anomalyHeadline = computed(() => {
   };
 });
 
+const selectedTrendWindow = computed(() => {
+  if (!vesselTrend.value?.windows?.length) return null;
+  if (selectedTrendWindowIndex.value === null) return null;
+  const point = vesselTrend.value.windows[selectedTrendWindowIndex.value];
+  if (!point) return null;
+  const start = new Date(point.window_start);
+  const end = new Date(start.getTime() + vesselTrend.value.interval_hours * 3600 * 1000);
+  return {
+    index: selectedTrendWindowIndex.value,
+    start: start.toISOString(),
+    end: end.toISOString(),
+    label: point.window_start.slice(5, 16).replace("T", " "),
+    pointCount: point.point_count,
+    meanSog: point.mean_sog,
+    lowSpeedRatio: point.low_speed_ratio,
+  };
+});
+
 const vesselStory = computed(() => {
   const historyTitle = vesselTrend.value
     ? `${vesselTrend.value.windows.length} 个分窗的历史轨迹`
@@ -223,7 +242,7 @@ const vesselStory = computed(() => {
 
   const currentTitle = selectedVessel.value?.recommendation || "当前状态";
   const currentDescription = vesselAnomaly.value
-    ? `${vesselAnomaly.value.anomaly_type_label} · ${vesselAnomaly.value.anomaly_type_summary}`
+    ? `${vesselAnomaly.value.anomaly_type_label} · 严重度 ${vesselAnomaly.value.anomaly_severity} · ${vesselAnomaly.value.anomaly_type_summary}`
     : "当前状态以规则链路和观测结果为主。";
 
   const forecastTitle = forecastAvailable.value
@@ -431,6 +450,14 @@ function onSelectMmsi(event) {
   router.push(`/vessels/${nextValue}`);
 }
 
+function onSelectTrendWindow(index) {
+  if (selectedTrendWindowIndex.value === index) {
+    selectedTrendWindowIndex.value = null;
+    return;
+  }
+  selectedTrendWindowIndex.value = index;
+}
+
 async function loadPageData() {
   pageError.value = "";
   trackError.value = "";
@@ -441,6 +468,7 @@ async function loadPageData() {
   vesselTrend.value = null;
   vesselForecast.value = null;
   vesselAnomaly.value = null;
+  selectedTrendWindowIndex.value = null;
 
   try {
     await fetchDemoData();
@@ -585,6 +613,16 @@ watch(
             <div class="summary-metric">
               <span>异常类型</span>
               <strong>{{ vesselAnomaly.anomaly_type_label }}</strong>
+            </div>
+            <div class="summary-metric">
+              <span>严重度</span>
+              <strong>{{ vesselAnomaly.anomaly_severity }}</strong>
+            </div>
+          </div>
+          <div v-if="vesselAnomaly?.dominant_evidence_title" class="list-row">
+            <div>
+              <strong>主导证据</strong>
+              <span>{{ vesselAnomaly.dominant_evidence_title }} · {{ vesselAnomaly.dominant_evidence_summary }}</span>
             </div>
           </div>
           <div v-if="vesselAnomaly?.anomaly_type_summary" class="list-row">
@@ -811,16 +849,25 @@ watch(
       </div>
       <div class="split-grid detail-layout">
         <article class="page-card map-panel-card">
-          <VesselTrackMap :track="vesselTrack" :nearest-reference="nearestReference" />
+          <VesselTrackMap :track="vesselTrack" :nearest-reference="nearestReference" :highlighted-window="selectedTrendWindow" />
         </article>
         <article class="page-card list-card">
           <div class="module-head">
             <h4>轨迹说明</h4>
           </div>
+          <div v-if="selectedTrendWindow" class="list-row">
+            <div>
+              <strong>联动时间窗</strong>
+              <span>
+                当前高亮 {{ selectedTrendWindow.label }}，共 {{ selectedTrendWindow.pointCount }} 个轨迹点，
+                平均航速 {{ selectedTrendWindow.meanSog ?? "暂无" }}，低速比例 {{ selectedTrendWindow.lowSpeedRatio ?? "暂无" }}。
+              </span>
+            </div>
+          </div>
           <div class="list-row">
             <div>
               <strong>交互开关</strong>
-              <span>可切换主轨迹、近 24 小时轨迹、低速点和参考点，并可一键回到全轨迹视角。</span>
+              <span>可切换主轨迹、近 24 小时轨迹、低速点和参考点，并可一键回到全轨迹视角；若选中趋势分窗，地图会同步高亮对应轨迹段。</span>
             </div>
           </div>
           <div class="list-row">
@@ -866,7 +913,10 @@ watch(
       <article class="page-card trend-card">
         <div class="module-head">
           <h4>{{ vesselTrend ? `${vesselTrend.interval_hours} 小时分窗趋势` : "时间趋势图" }}</h4>
-          <span class="status-pill" v-if="vesselTrend">真实分窗</span>
+          <div class="trend-head-actions">
+            <span class="status-pill" v-if="vesselTrend">真实分窗</span>
+            <button v-if="selectedTrendWindow" type="button" class="trend-reset-button" @click="selectedTrendWindowIndex = null">清除联动</button>
+          </div>
         </div>
         <div v-if="svgTrend" class="trend-stage">
           <svg :viewBox="`0 0 ${svgTrend.width} ${svgTrend.height}`" class="trend-svg" role="img" aria-label="单船时间趋势图">
@@ -899,7 +949,7 @@ watch(
               {{ axis.value }}
             </text>
             <rect
-              v-for="bar in svgTrend.bars"
+              v-for="(bar, index) in svgTrend.bars"
               :key="`bar-${bar.label}`"
               :x="bar.x"
               :y="bar.y"
@@ -907,28 +957,41 @@ watch(
               :height="bar.height"
               rx="6"
               class="trend-bar"
+              :class="{ 'trend-bar--active': selectedTrendWindowIndex === index }"
+              @click="onSelectTrendWindow(index)"
             />
             <path :d="svgTrend.speedPath" class="trend-speed-line" />
             <path :d="svgTrend.lowSpeedPath" class="trend-low-line" />
             <circle
-              v-for="bar in svgTrend.bars"
+              v-for="(bar, index) in svgTrend.bars"
               :key="`speed-${bar.label}`"
               :cx="bar.cx"
               :cy="bar.sogY"
               r="4"
               class="trend-speed-dot"
+              @click="onSelectTrendWindow(index)"
             />
             <circle
-              v-for="bar in svgTrend.bars"
+              v-for="(bar, index) in svgTrend.bars"
               :key="`slow-${bar.label}`"
               :cx="bar.cx"
               :cy="bar.lowSpeedY"
               r="4"
               class="trend-low-dot"
+              @click="onSelectTrendWindow(index)"
             />
           </svg>
           <div class="trend-labels">
-            <span v-for="bar in svgTrend.bars" :key="bar.label">{{ bar.label }}</span>
+            <button
+              v-for="(bar, index) in svgTrend.bars"
+              :key="bar.label"
+              type="button"
+              class="trend-label-button"
+              :class="{ active: selectedTrendWindowIndex === index }"
+              @click="onSelectTrendWindow(index)"
+            >
+              {{ bar.label }}
+            </button>
           </div>
           <div class="trend-legend">
             <span><i class="legend-swatch legend-swatch--bar"></i> 轨迹点数</span>

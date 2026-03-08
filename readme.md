@@ -1610,6 +1610,40 @@ project/
 本轮验证结果：
 - `pytest tests/test_exposure_anomaly.py tests/test_api.py tests/test_frontend_copy.py`: `15 passed`
 - `frontend npm run build`: passed
+55. 2.0 第二轮：异常严重度、主导证据与时空联动（2026-03-08）
+在完成异常类型识别之后，本轮继续把 2.0 的单船解释层和交互层做深，重点不是再加新模型，而是让当前模型结果更像一个完整的分析系统。
+
+本轮新增能力：
+- 异常结果新增：
+  - `anomaly_severity`
+  - `dominant_evidence`
+  - `dominant_evidence_title`
+  - `dominant_evidence_summary`
+- 总览页异常榜单现在会同时显示：
+  - 异常类型
+  - 严重度
+  - 主导证据
+- 单船页异常模块现在会单独展示：
+  - 严重度
+  - 主导证据
+- 单船页时间趋势与地图完成联动：
+  - 点击任一时间窗后，地图会高亮该时间窗对应的 AIS 轨迹段
+  - 用户可清除联动状态，恢复整体判读
+- 单船地图交互进一步增强：
+  - 主轨迹
+  - 近 24 小时轨迹
+  - 低速点
+  - 参考点
+  - 一键定位全轨迹
+
+当前实现说明：
+- “严重度”不是新模型输出，而是基于当前异常等级与异常分数的组合判断
+- “主导证据”来自异常解释字段中的首要偏离项，用于帮助用户快速定位最重要的异常来源
+- 时间趋势与地图联动的目标，是把历史行为曲线与空间轨迹真正对齐，避免用户只能分别看两张图而无法对应
+
+本轮验证结果：
+- `pytest tests/test_api.py tests/test_frontend_copy.py`: `10 passed`
+- `frontend npm run build`: passed
 50. 1.5 异常分级策略已完成核查与调整（2026-03-07）
 本轮对异常检测分级策略做了专门复核，重点回答两个问题：
 - 当前“高度异常”占比是否过高

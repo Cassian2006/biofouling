@@ -209,9 +209,11 @@ class VesselAnomalyRecord(BaseModel):
     mmsi: str
     anomaly_score: float
     anomaly_level: str
+    anomaly_severity: str | None = None
     anomaly_type: str | None = None
     anomaly_type_label: str | None = None
     anomaly_type_summary: str | None = None
+    dominant_evidence: str | None = None
     explanations: list[str]
     summary_sentence: str | None = None
 
@@ -238,9 +240,12 @@ class VesselAnomalyDetailResponse(BaseModel):
     mmsi: str
     anomaly_score: float
     anomaly_level: str
+    anomaly_severity: str
     anomaly_type: str
     anomaly_type_label: str
     anomaly_type_summary: str
+    dominant_evidence_title: str | None
+    dominant_evidence_summary: str | None
     percentile_rank: float
     summary_sentence: str
     explanations: list[str]

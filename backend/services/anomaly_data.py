@@ -128,6 +128,27 @@ def _build_driver_details(row: pd.Series, cohort_frame: pd.DataFrame) -> list[Ve
     return drivers
 
 
+def _anomaly_severity(row: pd.Series) -> str:
+    level = str(row.get("anomaly_level", "normal"))
+    score = float(row.get("anomaly_score", 0.0))
+    if level == "observation_insufficient":
+        return "证据不足"
+    if level == "highly_abnormal":
+        return "高" if score >= 0.6 else "中高"
+    if level == "suspicious":
+        return "中" if score >= 0.2 else "中低"
+    return "低"
+
+
+def _dominant_evidence(drivers: list[VesselAnomalyDriver]) -> tuple[str | None, str | None]:
+    if not drivers:
+        return None, None
+    primary = drivers[0]
+    direction = "偏高" if primary.direction == "higher" else "偏低" if primary.direction == "lower" else "偏离"
+    title = f"{primary.feature_label}{direction}"
+    return title, primary.interpretation
+
+
 def _build_summary_sentence(
     row: pd.Series,
     cohort_frame: pd.DataFrame,
@@ -175,6 +196,8 @@ def _serialize_records(frame: pd.DataFrame, cohort_frame: pd.DataFrame) -> list[
     records: list[VesselAnomalyRecord] = []
     for rank, row in enumerate(frame.itertuples(index=False), start=1):
         row_series = pd.Series(row._asdict())
+        drivers = _build_driver_details(row_series, cohort_frame)
+        dominant_title, _ = _dominant_evidence(drivers)
         explanations = [
             str(value)
             for value in [getattr(row, "explanation_1", ""), getattr(row, "explanation_2", ""), getattr(row, "explanation_3", "")]
@@ -187,9 +210,11 @@ def _serialize_records(frame: pd.DataFrame, cohort_frame: pd.DataFrame) -> list[
                 mmsi=str(row.mmsi),
                 anomaly_score=round(float(row.anomaly_score), 6),
                 anomaly_level=str(row.anomaly_level),
+                anomaly_severity=_anomaly_severity(row_series),
                 anomaly_type=anomaly_type,
                 anomaly_type_label=anomaly_type_label,
                 anomaly_type_summary=anomaly_type_summary,
+                dominant_evidence=dominant_title,
                 explanations=explanations,
                 summary_sentence=_build_summary_sentence(row_series, cohort_frame),
             )
@@ -256,15 +281,19 @@ def get_vessel_anomaly_detail(mmsi: str) -> VesselAnomalyDetailResponse:
     percentile_rank = round(1 - ((rank - 1) / max(len(anomaly_frame) - 1, 1)), 4)
     peer_frame = cohort_frame.loc[cohort_frame["mmsi"] != str(mmsi)].head(6).reset_index(drop=True)
     driver_details = _build_driver_details(record, cohort_frame)
+    dominant_title, dominant_summary = _dominant_evidence(driver_details)
     anomaly_type, anomaly_type_label, anomaly_type_summary = _anomaly_type_fields(record, cohort_frame)
     return VesselAnomalyDetailResponse(
         window_label=payload["window_label"],  # type: ignore[arg-type]
         mmsi=str(mmsi),
         anomaly_score=round(float(record["anomaly_score"]), 6),
         anomaly_level=str(record["anomaly_level"]),
+        anomaly_severity=_anomaly_severity(record),
         anomaly_type=anomaly_type,
         anomaly_type_label=anomaly_type_label,
         anomaly_type_summary=anomaly_type_summary,
+        dominant_evidence_title=dominant_title,
+        dominant_evidence_summary=dominant_summary,
         percentile_rank=percentile_rank,
         summary_sentence=_build_summary_sentence(record, cohort_frame),
         explanations=_explanations_from_row(record),

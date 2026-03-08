@@ -260,6 +260,23 @@ img {
   gap: 12px;
 }
 
+.trend-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.trend-reset-button {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
 .module-head h4,
 .feature-panel h4,
 .list-card strong,
@@ -820,6 +837,11 @@ img {
 
 .trend-bar {
   fill: rgba(15, 118, 110, 0.2);
+  cursor: pointer;
+}
+
+.trend-bar--active {
+  fill: rgba(124, 58, 237, 0.3);
 }
 
 .trend-speed-line {
@@ -840,10 +862,12 @@ img {
 
 .trend-speed-dot {
   fill: #155e75;
+  cursor: pointer;
 }
 
 .trend-low-dot {
   fill: #c2410c;
+  cursor: pointer;
 }
 
 .trend-labels {
@@ -852,8 +876,21 @@ img {
   gap: 8px;
   padding: 10px 14px 14px;
   border-top: 1px solid var(--line);
+}
+
+.trend-label-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
   font-size: 11px;
   color: var(--muted);
+  cursor: pointer;
+}
+
+.trend-label-button.active {
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .trend-grid-line {

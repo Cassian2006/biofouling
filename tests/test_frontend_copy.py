@@ -50,6 +50,9 @@ def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
     assert "selector-input" in vessel
     assert "简要结论" in vessel
     assert "历史-当前-预测链路" in vessel
+    assert "主导证据" in vessel
+    assert "联动时间窗" in vessel
+    assert "清除联动" in vessel
     assert "定位全轨迹" in read_text("frontend/src/components/VesselTrackMap.vue")
 
     assert 'redirect: "/"' in router

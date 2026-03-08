@@ -11,6 +11,10 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  highlightedWindow: {
+    type: Object,
+    default: null,
+  },
 });
 
 const mapElement = ref(null);
@@ -24,6 +28,7 @@ let trackLayer;
 let recentTrackLayer;
 let lowSpeedLayer;
 let markerLayer;
+let windowLayer;
 
 function fitToTrack() {
   if (!map || !props.track?.points?.length) return;
@@ -32,11 +37,12 @@ function fitToTrack() {
 }
 
 function renderTrack() {
-  if (!map || !trackLayer || !recentTrackLayer || !lowSpeedLayer || !markerLayer) return;
+  if (!map || !trackLayer || !recentTrackLayer || !lowSpeedLayer || !markerLayer || !windowLayer) return;
   trackLayer.clearLayers();
   recentTrackLayer.clearLayers();
   lowSpeedLayer.clearLayers();
   markerLayer.clearLayers();
+  windowLayer.clearLayers();
 
   if (!props.track?.points?.length) return;
 
@@ -107,6 +113,27 @@ function renderTrack() {
       });
   }
 
+  if (props.highlightedWindow?.start && props.highlightedWindow?.end) {
+    const start = new Date(props.highlightedWindow.start).getTime();
+    const end = new Date(props.highlightedWindow.end).getTime();
+    const highlightedPoints = props.track.points.filter((point) => {
+      const timestamp = new Date(point.timestamp).getTime();
+      return timestamp >= start && timestamp < end;
+    });
+    if (highlightedPoints.length >= 2) {
+      L.polyline(
+        highlightedPoints.map((point) => [point.latitude, point.longitude]),
+        {
+          color: "#7c3aed",
+          weight: 6,
+          opacity: 0.9,
+        },
+      )
+        .bindTooltip("当前选中时间窗")
+        .addTo(windowLayer);
+    }
+  }
+
   if (props.nearestReference && showReferencePoint.value) {
     L.circleMarker([props.nearestReference.latitude, props.nearestReference.longitude], {
       radius: 5,
@@ -136,12 +163,13 @@ onMounted(() => {
   recentTrackLayer = L.layerGroup().addTo(map);
   lowSpeedLayer = L.layerGroup().addTo(map);
   markerLayer = L.layerGroup().addTo(map);
+  windowLayer = L.layerGroup().addTo(map);
   map.setView([1.25, 103.9], 8);
   renderTrack();
 });
 
 watch(
-  () => [props.track, props.nearestReference, showTrackLine.value, showRecentSegment.value, showLowSpeedPoints.value, showReferencePoint.value],
+  () => [props.track, props.nearestReference, props.highlightedWindow, showTrackLine.value, showRecentSegment.value, showLowSpeedPoints.value, showReferencePoint.value],
   () => {
     renderTrack();
   },

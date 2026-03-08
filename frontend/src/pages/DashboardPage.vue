@@ -325,7 +325,7 @@ onMounted(async () => {
             <div>
               <strong>{{ item.mmsi }}</strong>
               <span>{{ item.summary_sentence || `${levelLabel(item.anomaly_level)} · ${item.explanations[0] || "异常驱动待补充"}` }}</span>
-              <span>{{ item.anomaly_type_label || "异常类型待识别" }}</span>
+              <span>{{ item.anomaly_type_label || "异常类型待识别" }} · 严重度 {{ item.anomaly_severity || "待定" }}{{ item.dominant_evidence ? ` · ${item.dominant_evidence}` : "" }}</span>
             </div>
             <div class="list-metric">
               <div>#{{ item.rank }}</div>

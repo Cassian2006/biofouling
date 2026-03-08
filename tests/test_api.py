@@ -82,6 +82,9 @@ def test_vessel_detail_track_and_trend_endpoints_return_real_payloads() -> None:
     }
     assert anomaly_payload["anomaly_type_label"]
     assert anomaly_payload["anomaly_type_summary"]
+    assert anomaly_payload["anomaly_severity"]
+    assert anomaly_payload["dominant_evidence_title"]
+    assert anomaly_payload["dominant_evidence_summary"]
     assert anomaly_payload["summary_sentence"]
     assert isinstance(anomaly_payload["driver_details"], list)
     assert len(anomaly_payload["peer_anomalies"]) <= 6
@@ -143,6 +146,8 @@ def test_regional_endpoints_return_expected_distribution() -> None:
     assert anomaly_payload["top_anomalies"][0]["mmsi"] == "563215100"
     assert anomaly_payload["top_anomalies"][0]["summary_sentence"]
     assert anomaly_payload["top_anomalies"][0]["anomaly_type_label"]
+    assert anomaly_payload["top_anomalies"][0]["anomaly_severity"]
+    assert anomaly_payload["top_anomalies"][0]["dominant_evidence"]
     assert all(item["anomaly_level"] != "observation_insufficient" for item in anomaly_payload["top_anomalies"])
 
 
