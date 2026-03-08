@@ -6,6 +6,8 @@ from pathlib import Path
 import pandas as pd
 
 from backend.schemas.demo import (
+    AnomalyTypeMetricProfile,
+    AnomalyTypeProfile,
     VesselAnomalyDetailResponse,
     VesselAnomalyDriver,
     VesselAnomalyRecord,
@@ -44,6 +46,13 @@ FEATURE_INTERPRETATIONS = {
     "fpi_proxy": "说明规则链路下的污损倾向判断与同批船差异较大。",
     "ecp_proxy": "说明环境复合压力与同批对象相比更突出。",
 }
+
+TYPE_PROFILE_METRICS = [
+    ("low_speed_ratio", "低速暴露比例"),
+    ("track_duration_hours", "轨迹时长"),
+    ("mean_sst", "平均海温暴露"),
+    ("mean_chlorophyll_a", "平均叶绿素暴露"),
+]
 
 
 def _latest_anomaly_csv() -> Path:
@@ -222,6 +231,70 @@ def _serialize_records(frame: pd.DataFrame, cohort_frame: pd.DataFrame) -> list[
     return records
 
 
+def _metric_direction(delta: float | None) -> str:
+    if delta is None:
+        return "flat"
+    if delta > 0.02:
+        return "higher"
+    if delta < -0.02:
+        return "lower"
+    return "flat"
+
+
+def _build_type_profiles(anomaly_frame: pd.DataFrame) -> list[AnomalyTypeProfile]:
+    typed_frame = anomaly_frame.copy()
+    typed_frame["anomaly_type"] = typed_frame.apply(lambda row: classify_anomaly_type(row, anomaly_frame), axis=1)
+    normal_frame = typed_frame.loc[typed_frame["anomaly_level"] == "normal"]
+    profile_order = [
+        "long_dwell_low_speed",
+        "warm_productive_water",
+        "mixed_anomaly",
+        "sparse_observation",
+    ]
+
+    profiles: list[AnomalyTypeProfile] = []
+    for anomaly_type in profile_order:
+        type_frame = typed_frame.loc[typed_frame["anomaly_type"] == anomaly_type]
+        if type_frame.empty:
+            continue
+
+        metrics: list[AnomalyTypeMetricProfile] = []
+        for metric_key, metric_label in TYPE_PROFILE_METRICS:
+            type_mean = round(float(type_frame[metric_key].mean()), 4) if metric_key in type_frame else None
+            normal_mean = (
+                round(float(normal_frame[metric_key].mean()), 4)
+                if metric_key in normal_frame and not normal_frame.empty
+                else None
+            )
+            delta = (
+                round(type_mean - normal_mean, 4)
+                if type_mean is not None and normal_mean is not None
+                else None
+            )
+            metrics.append(
+                AnomalyTypeMetricProfile(
+                    metric_key=metric_key,
+                    metric_label=metric_label,
+                    type_mean=type_mean,
+                    normal_mean=normal_mean,
+                    delta=delta,
+                    direction=_metric_direction(delta),
+                )
+            )
+
+        summary = build_anomaly_type_summary(type_frame.iloc[0], anomaly_frame, anomaly_type)
+        profiles.append(
+            AnomalyTypeProfile(
+                anomaly_type=anomaly_type,
+                anomaly_type_label=ANOMALY_TYPE_LABELS.get(anomaly_type, anomaly_type),
+                vessel_count=int(len(type_frame)),
+                summary=summary,
+                key_metrics=metrics,
+            )
+        )
+    return profiles
+
+
 @lru_cache(maxsize=4)
 def _load_anomaly_payload_by_signature(signature: tuple[str, ...]) -> dict[str, object]:
     anomaly_path = _latest_anomaly_csv()
@@ -246,6 +319,7 @@ def _load_anomaly_payload_by_signature(signature: tuple[str, ...]) -> dict[str, 
         .to_dict()
     )
     top_anomalies = _serialize_records(cohort_frame.head(12), cohort_frame)
+    type_profiles = _build_type_profiles(anomaly_frame)
     return {
         "window_label": window_label,
         "anomaly_frame": anomaly_frame,
@@ -255,6 +329,7 @@ def _load_anomaly_payload_by_signature(signature: tuple[str, ...]) -> dict[str, 
             vessel_count=int(len(anomaly_frame)),
             anomaly_level_counts={str(key): int(value) for key, value in level_counts.items()},
             anomaly_type_counts={str(key): int(value) for key, value in type_counts.items()},
+            anomaly_type_profiles=type_profiles,
             top_anomalies=top_anomalies,
         ),
     }

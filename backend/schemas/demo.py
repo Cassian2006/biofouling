@@ -227,11 +227,29 @@ class VesselAnomalyDriver(BaseModel):
     interpretation: str
 
 
+class AnomalyTypeMetricProfile(BaseModel):
+    metric_key: str
+    metric_label: str
+    type_mean: float | None
+    normal_mean: float | None
+    delta: float | None
+    direction: str
+
+
+class AnomalyTypeProfile(BaseModel):
+    anomaly_type: str
+    anomaly_type_label: str
+    vessel_count: int
+    summary: str
+    key_metrics: list[AnomalyTypeMetricProfile]
+
+
 class VesselAnomalyResponse(BaseModel):
     window_label: str
     vessel_count: int
     anomaly_level_counts: dict[str, int]
     anomaly_type_counts: dict[str, int]
+    anomaly_type_profiles: list[AnomalyTypeProfile]
     top_anomalies: list[VesselAnomalyRecord]
 
 

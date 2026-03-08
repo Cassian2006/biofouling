@@ -35,6 +35,7 @@ const referenceSites = computed(() => regionalStats.value?.reference_sites || []
 const layerMeta = computed(() => layerOptions.find((item) => item.key === activeLayer.value) || layerOptions[0]);
 const anomalyCounts = computed(() => anomalySummary.value?.anomaly_level_counts || {});
 const anomalyTypeCounts = computed(() => anomalySummary.value?.anomaly_type_counts || {});
+const anomalyTypeProfiles = computed(() => anomalySummary.value?.anomaly_type_profiles || []);
 const topAnomalies = computed(() => anomalySummary.value?.top_anomalies || []);
 
 const sortedCells = computed(() =>
@@ -332,6 +333,40 @@ onMounted(async () => {
               <div>Score {{ item.anomaly_score }}</div>
             </div>
           </RouterLink>
+        </article>
+      </div>
+    </section>
+
+    <section class="content-section">
+      <div class="section-head">
+        <p class="section-kicker">Type Compare</p>
+        <h3>
+          异常类型对比
+          <HintTooltip text="将各类异常对象与正常船舶做对比，帮助理解每类异常最突出的偏离指标。" />
+        </h3>
+      </div>
+      <div class="card-grid anomaly-profile-grid">
+        <article v-for="profile in anomalyTypeProfiles" :key="profile.anomaly_type" class="page-card module-card">
+          <div class="module-head">
+            <h4>{{ profile.anomaly_type_label }}</h4>
+            <span class="status-pill">{{ profile.vessel_count }} 艘</span>
+          </div>
+          <p>{{ profile.summary }}</p>
+          <div class="signal-chip-list">
+            <div v-for="metric in profile.key_metrics" :key="metric.metric_key" class="signal-chip">
+              <strong>{{ metric.metric_label }}</strong>
+              <span>类型均值 {{ metric.type_mean ?? "暂无" }} · 正常均值 {{ metric.normal_mean ?? "暂无" }}</span>
+              <small>
+                {{
+                  metric.direction === "higher"
+                    ? `较正常船偏高 ${metric.delta}`
+                    : metric.direction === "lower"
+                      ? `较正常船偏低 ${Math.abs(metric.delta)}`
+                      : "与正常船差异较小"
+                }}
+              </small>
+            </div>
+          </div>
         </article>
       </div>
     </section>

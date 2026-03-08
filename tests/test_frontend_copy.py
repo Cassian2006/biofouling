@@ -45,6 +45,7 @@ def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
     assert "需复核" in dashboard
     assert "长时低速型" in dashboard
     assert "观测稀疏型" in dashboard
+    assert "异常类型对比" in dashboard
 
     assert "VesselTrackMap" in vessel
     assert "selector-input" in vessel

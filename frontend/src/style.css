@@ -1095,6 +1095,10 @@ img {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.anomaly-profile-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .signal-chip {
   padding: 14px 16px;
   border-radius: 16px;
@@ -1210,7 +1214,8 @@ img {
   .forecast-meta-grid,
   .anomaly-chip-row,
   .anomaly-overview-grid,
-  .anomaly-type-grid {
+  .anomaly-type-grid,
+  .anomaly-profile-grid {
     grid-template-columns: 1fr;
   }
 

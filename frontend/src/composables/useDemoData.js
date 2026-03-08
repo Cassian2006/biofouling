@@ -219,6 +219,28 @@ function buildAnomalySummaryFallback() {
       mixed_anomaly: Math.max(Math.min(8, Math.max(ranked.length - 10, 0)), 0),
       sparse_observation: 0,
     },
+    anomaly_type_profiles: [
+      {
+        anomaly_type: "long_dwell_low_speed",
+        anomaly_type_label: "长时低速型",
+        vessel_count: Math.min(6, ranked.length),
+        summary: "当前回退样本显示出较长时间低速停留的共同特征。",
+        key_metrics: [
+          { metric_key: "low_speed_ratio", metric_label: "低速暴露比例", type_mean: 0.92, normal_mean: 0.41, delta: 0.51, direction: "higher" },
+          { metric_key: "track_duration_hours", metric_label: "轨迹时长", type_mean: 300, normal_mean: 120, delta: 180, direction: "higher" },
+        ],
+      },
+      {
+        anomaly_type: "warm_productive_water",
+        anomaly_type_label: "高温高叶绿素型",
+        vessel_count: Math.min(4, Math.max(ranked.length - 6, 0)),
+        summary: "当前回退样本显示出更高的海温与叶绿素暴露。",
+        key_metrics: [
+          { metric_key: "mean_sst", metric_label: "平均海温暴露", type_mean: 28.3, normal_mean: 27.4, delta: 0.9, direction: "higher" },
+          { metric_key: "mean_chlorophyll_a", metric_label: "平均叶绿素暴露", type_mean: 0.42, normal_mean: 0.23, delta: 0.19, direction: "higher" },
+        ],
+      },
+    ],
     top_anomalies: ranked.slice(0, 12).map((item, index) => ({
       rank: index + 1,
       mmsi: item.mmsi,

@@ -148,6 +148,9 @@ def test_regional_endpoints_return_expected_distribution() -> None:
     assert anomaly_payload["top_anomalies"][0]["anomaly_type_label"]
     assert anomaly_payload["top_anomalies"][0]["anomaly_severity"]
     assert anomaly_payload["top_anomalies"][0]["dominant_evidence"]
+    assert len(anomaly_payload["anomaly_type_profiles"]) >= 3
+    assert anomaly_payload["anomaly_type_profiles"][0]["anomaly_type_label"]
+    assert len(anomaly_payload["anomaly_type_profiles"][0]["key_metrics"]) >= 2
     assert all(item["anomaly_level"] != "observation_insufficient" for item in anomaly_payload["top_anomalies"])
 
 
