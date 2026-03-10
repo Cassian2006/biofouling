@@ -244,12 +244,32 @@ class AnomalyTypeProfile(BaseModel):
     key_metrics: list[AnomalyTypeMetricProfile]
 
 
+class AnomalyTypeHotspotRecord(BaseModel):
+    grid_key: str
+    grid_lat: float
+    grid_lon: float
+    vessel_count: int
+    anomaly_score_mean: float | None
+    rri_score: float | None
+    risk_level: str
+
+
+class AnomalyTypeSpatialSlice(BaseModel):
+    anomaly_type: str
+    anomaly_type_label: str
+    vessel_count: int
+    highlighted_cells: int
+    summary: str
+    top_hotspots: list[AnomalyTypeHotspotRecord]
+
+
 class VesselAnomalyResponse(BaseModel):
     window_label: str
     vessel_count: int
     anomaly_level_counts: dict[str, int]
     anomaly_type_counts: dict[str, int]
     anomaly_type_profiles: list[AnomalyTypeProfile]
+    anomaly_type_spatial_slices: list[AnomalyTypeSpatialSlice]
     top_anomalies: list[VesselAnomalyRecord]
 
 

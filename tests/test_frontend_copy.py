@@ -17,6 +17,8 @@ def test_tooltip_and_map_components_exist() -> None:
     assert "hint-tooltip__bubble" in tooltip
     assert "leaflet" in overview_map.lower()
     assert "DISPLAY_SUBDIVISIONS = 1" in overview_map
+    assert "map-overlay-badge" in overview_map
+    assert "focusedHotspotKeys" in overview_map
     assert "leaflet" in vessel_map.lower()
     assert "FPI = 0.5" in method_drawer
     assert "RRI = 0.40" in method_drawer
@@ -41,6 +43,7 @@ def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
     assert "水域情况" in dashboard
     assert "异常暴露筛查" in dashboard
     assert "异常船舶榜单" in dashboard
+    assert "类型空间热点" in dashboard
     assert "最高优先级船舶" in dashboard
     assert "需复核" in dashboard
     assert "长时低速型" in dashboard
@@ -48,6 +51,8 @@ def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
     assert "异常类型对比" in dashboard
     assert "当前切片" in dashboard
     assert "anomalyType" in dashboard
+    assert "focused-hotspot-keys" in dashboard
+    assert "focused-hotspot-label" in dashboard
 
     assert "VesselTrackMap" in vessel
     assert "selector-input" in vessel

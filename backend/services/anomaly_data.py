@@ -6,14 +6,22 @@ from pathlib import Path
 import pandas as pd
 
 from backend.schemas.demo import (
+    AnomalyTypeHotspotRecord,
     AnomalyTypeMetricProfile,
     AnomalyTypeProfile,
+    AnomalyTypeSpatialSlice,
     VesselAnomalyDetailResponse,
     VesselAnomalyDriver,
     VesselAnomalyRecord,
     VesselAnomalyResponse,
 )
-from backend.services.demo_data import PROCESSED_DIR, PROJECT_ROOT, _latest_file, _window_label_from_features
+from backend.services.demo_data import (
+    PROCESSED_DIR,
+    PROJECT_ROOT,
+    _latest_file,
+    _window_label_from_features,
+    get_demo_risk_cells,
+)
 from scripts.exposure_anomaly import (
     ANOMALY_TYPE_LABELS,
     build_anomaly_type_summary,
@@ -54,6 +62,13 @@ TYPE_PROFILE_METRICS = [
     ("mean_chlorophyll_a", "平均叶绿素暴露"),
 ]
 
+TYPE_HOTSPOT_ORDER = [
+    "long_dwell_low_speed",
+    "warm_productive_water",
+    "mixed_anomaly",
+    "sparse_observation",
+]
+
 
 def _latest_anomaly_csv() -> Path:
     matches = sorted(MODELS_DIR.glob("exposure_autoencoder_*/evaluation/vessel_anomaly_scores.csv"))
@@ -65,7 +80,9 @@ def _latest_anomaly_csv() -> Path:
 def _anomaly_signature() -> tuple[str, ...]:
     anomaly_path = _latest_anomaly_csv()
     features_path = _latest_file(PROCESSED_DIR, "vessel_features_*.csv")
-    paths = [anomaly_path, features_path]
+    risk_path = PROJECT_ROOT / "outputs" / "maps"
+    latest_risk_path = _latest_file(risk_path, "regional_risk_*.csv")
+    paths = [anomaly_path, features_path, latest_risk_path]
     return tuple(f"{path.resolve()}::{path.stat().st_mtime_ns}" for path in paths)
 
 
@@ -241,19 +258,127 @@ def _metric_direction(delta: float | None) -> str:
     return "flat"
 
 
+def _nearest_hotspot_key(
+    latitude: float | None,
+    longitude: float | None,
+    risk_cells_by_key: dict[str, object],
+) -> str | None:
+    if latitude is None or longitude is None:
+        return None
+
+    best_key = None
+    best_distance = None
+    for key, cell in risk_cells_by_key.items():
+        distance = abs(float(cell.grid_lat) - latitude) + abs(float(cell.grid_lon) - longitude)
+        if best_distance is None or distance < best_distance:
+            best_key = key
+            best_distance = distance
+    return best_key
+
+
+def _build_type_spatial_slices(
+    anomaly_frame: pd.DataFrame,
+    feature_frame: pd.DataFrame,
+) -> list[AnomalyTypeSpatialSlice]:
+    typed_frame = anomaly_frame.copy()
+    typed_frame["anomaly_type"] = typed_frame.apply(lambda row: classify_anomaly_type(row, anomaly_frame), axis=1)
+
+    feature_columns = [
+        "mmsi",
+        "mean_latitude",
+        "mean_longitude",
+        "fpi_proxy",
+    ]
+    merged = typed_frame.merge(
+        feature_frame[feature_columns],
+        on="mmsi",
+        how="left",
+        suffixes=("", "_feature"),
+    )
+
+    risk_cells = get_demo_risk_cells()
+    risk_cells_by_key = {f"{cell.grid_lat}-{cell.grid_lon}": cell for cell in risk_cells}
+    merged["grid_key"] = merged.apply(
+        lambda row: _nearest_hotspot_key(
+            float(row["mean_latitude"]) if pd.notna(row["mean_latitude"]) else None,
+            float(row["mean_longitude"]) if pd.notna(row["mean_longitude"]) else None,
+            risk_cells_by_key,
+        ),
+        axis=1,
+    )
+    merged = merged.dropna(subset=["grid_key"]).copy()
+
+    slices: list[AnomalyTypeSpatialSlice] = []
+    for anomaly_type in TYPE_HOTSPOT_ORDER:
+        type_frame = merged.loc[merged["anomaly_type"] == anomaly_type].copy()
+        if type_frame.empty:
+            continue
+
+        grouped = (
+            type_frame.groupby("grid_key", dropna=False)
+            .agg(
+                vessel_count=("mmsi", "nunique"),
+                anomaly_score_mean=("anomaly_score", "mean"),
+            )
+            .reset_index()
+        )
+        grouped["rri_score"] = grouped["grid_key"].map(
+            lambda key: risk_cells_by_key[key].rri_score if key in risk_cells_by_key else None
+        )
+        grouped["risk_level"] = grouped["grid_key"].map(
+            lambda key: risk_cells_by_key[key].risk_level if key in risk_cells_by_key else "low"
+        )
+        grouped = grouped.sort_values(
+            ["vessel_count", "anomaly_score_mean", "rri_score"],
+            ascending=[False, False, False],
+        ).reset_index(drop=True)
+
+        top_hotspots: list[AnomalyTypeHotspotRecord] = []
+        for row in grouped.head(6).itertuples(index=False):
+            cell = risk_cells_by_key.get(str(row.grid_key))
+            if cell is None:
+                continue
+            top_hotspots.append(
+                AnomalyTypeHotspotRecord(
+                    grid_key=str(row.grid_key),
+                    grid_lat=float(cell.grid_lat),
+                    grid_lon=float(cell.grid_lon),
+                    vessel_count=int(row.vessel_count),
+                    anomaly_score_mean=round(float(row.anomaly_score_mean), 4),
+                    rri_score=cell.rri_score,
+                    risk_level=str(row.risk_level),
+                )
+            )
+
+        summary = build_anomaly_type_summary(type_frame.iloc[0], anomaly_frame, anomaly_type)
+        if top_hotspots:
+            lead = top_hotspots[0]
+            summary = (
+                f"{summary} 该类型当前主要集中在 {len(grouped)} 个格网，"
+                f"最突出的热点位于 {lead.grid_lat}, {lead.grid_lon}。"
+            )
+
+        slices.append(
+            AnomalyTypeSpatialSlice(
+                anomaly_type=anomaly_type,
+                anomaly_type_label=ANOMALY_TYPE_LABELS.get(anomaly_type, anomaly_type),
+                vessel_count=int(type_frame["mmsi"].nunique()),
+                highlighted_cells=int(len(grouped)),
+                summary=summary,
+                top_hotspots=top_hotspots,
+            )
+        )
+
+    return slices
+
+
 def _build_type_profiles(anomaly_frame: pd.DataFrame) -> list[AnomalyTypeProfile]:
     typed_frame = anomaly_frame.copy()
     typed_frame["anomaly_type"] = typed_frame.apply(lambda row: classify_anomaly_type(row, anomaly_frame), axis=1)
     normal_frame = typed_frame.loc[typed_frame["anomaly_level"] == "normal"]
-    profile_order = [
-        "long_dwell_low_speed",
-        "warm_productive_water",
-        "mixed_anomaly",
-        "sparse_observation",
-    ]
 
     profiles: list[AnomalyTypeProfile] = []
-    for anomaly_type in profile_order:
+    for anomaly_type in TYPE_HOTSPOT_ORDER:
         type_frame = typed_frame.loc[typed_frame["anomaly_type"] == anomaly_type]
         if type_frame.empty:
             continue
@@ -300,6 +425,7 @@ def _load_anomaly_payload_by_signature(signature: tuple[str, ...]) -> dict[str, 
     anomaly_path = _latest_anomaly_csv()
     features_path = _latest_file(PROCESSED_DIR, "vessel_features_*.csv")
     anomaly_frame = _normalize_columns(pd.read_csv(anomaly_path))
+    feature_frame = _normalize_columns(pd.read_csv(features_path))
     anomaly_frame = anomaly_frame.sort_values(["anomaly_score", "mmsi"], ascending=[False, True]).reset_index(drop=True)
     cohort_frame = _cohort_frame(anomaly_frame)
     window_label = _window_label_from_features(features_path)
@@ -320,6 +446,7 @@ def _load_anomaly_payload_by_signature(signature: tuple[str, ...]) -> dict[str, 
     )
     top_anomalies = _serialize_records(cohort_frame.head(12), cohort_frame)
     type_profiles = _build_type_profiles(anomaly_frame)
+    spatial_slices = _build_type_spatial_slices(anomaly_frame, feature_frame)
     return {
         "window_label": window_label,
         "anomaly_frame": anomaly_frame,
@@ -330,6 +457,7 @@ def _load_anomaly_payload_by_signature(signature: tuple[str, ...]) -> dict[str, 
             anomaly_level_counts={str(key): int(value) for key, value in level_counts.items()},
             anomaly_type_counts={str(key): int(value) for key, value in type_counts.items()},
             anomaly_type_profiles=type_profiles,
+            anomaly_type_spatial_slices=spatial_slices,
             top_anomalies=top_anomalies,
         ),
     }

@@ -19,6 +19,14 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  focusedHotspotKeys: {
+    type: Array,
+    default: () => [],
+  },
+  focusedHotspotLabel: {
+    type: String,
+    default: "",
+  },
 });
 
 const emit = defineEmits(["select-hotspot"]);
@@ -39,6 +47,7 @@ const DISPLAY_SUBDIVISIONS = 1;
 const cellsByKey = computed(() =>
   new Map(props.cells.map((cell) => [`${cell.grid_lat}-${cell.grid_lon}`, cell])),
 );
+const focusedKeySet = computed(() => new Set(props.focusedHotspotKeys));
 
 function getSpacing(values, fallback) {
   const unique = [...new Set(values.filter((value) => Number.isFinite(value)).map(Number))].sort((a, b) => a - b);
@@ -114,24 +123,35 @@ function renderMap() {
   const values = props.cells.map((cell) => getLayerValue(cell));
   const minValue = Math.min(...values);
   const maxValue = Math.max(...values);
+  const hasFocusedSlice = focusedKeySet.value.size > 0;
 
   for (const cell of props.cells) {
     const value = getLayerValue(cell);
     const key = `${cell.grid_lat}-${cell.grid_lon}`;
+    const isFocused = focusedKeySet.value.has(key);
     const displayBounds = createDisplayBounds(cell, latStep, lonStep);
     for (const displayBound of displayBounds) {
       const rectangle = L.rectangle(displayBound, {
-        color: "rgba(255,255,255,0.35)",
-        weight: 0.4,
+        color: hasFocusedSlice && isFocused ? "rgba(29,26,22,0.72)" : "rgba(255,255,255,0.35)",
+        weight: hasFocusedSlice && isFocused ? 1.1 : 0.4,
         fillColor: getColorScale(value, minValue, maxValue),
-        fillOpacity: 0.7,
+        fillOpacity: hasFocusedSlice ? (isFocused ? 0.84 : 0.2) : 0.7,
       });
       rectangle.on("click", () => emit("select-hotspot", key));
       rectangle.bindTooltip(
-        `${cell.grid_lat}, ${cell.grid_lon}<br>${props.activeLayer}: ${value.toFixed(3)}<br>RRI: ${Number(cell.rri_score || 0).toFixed(3)}`,
+        `${cell.grid_lat}, ${cell.grid_lon}<br>${props.activeLayer}: ${value.toFixed(3)}<br>RRI: ${Number(cell.rri_score || 0).toFixed(3)}${isFocused ? "<br>当前异常类型相关热点" : ""}`,
         { sticky: true },
       );
       rectangle.addTo(gridLayer);
+    }
+
+    if (hasFocusedSlice && isFocused) {
+      L.rectangle(toLeafletBounds(getCellBounds(cell, latStep, lonStep)), {
+        color: "#b45309",
+        weight: 1.8,
+        fillOpacity: 0,
+        opacity: 0.9,
+      }).addTo(highlightLayer);
     }
   }
 
@@ -174,7 +194,7 @@ onMounted(() => {
 });
 
 watch(
-  () => [props.cells, props.activeLayer, props.selectedHotspotKey, props.referenceSites],
+  () => [props.cells, props.activeLayer, props.selectedHotspotKey, props.referenceSites, props.focusedHotspotKeys],
   () => {
     renderMap();
   },
@@ -189,5 +209,11 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="mapElement" class="leaflet-map-stage"></div>
+  <div class="map-panel-shell">
+    <div ref="mapElement" class="leaflet-map-stage"></div>
+    <div v-if="focusedHotspotLabel" class="map-overlay-badge">
+      <strong>{{ focusedHotspotLabel }}</strong>
+      <span>地图已强调当前异常类型更集中的热点格网。</span>
+    </div>
+  </div>
 </template>

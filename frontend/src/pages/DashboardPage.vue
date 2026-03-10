@@ -37,6 +37,7 @@ const layerMeta = computed(() => layerOptions.find((item) => item.key === active
 const anomalyCounts = computed(() => anomalySummary.value?.anomaly_level_counts || {});
 const anomalyTypeCounts = computed(() => anomalySummary.value?.anomaly_type_counts || {});
 const anomalyTypeProfiles = computed(() => anomalySummary.value?.anomaly_type_profiles || []);
+const anomalyTypeSpatialSlices = computed(() => anomalySummary.value?.anomaly_type_spatial_slices || []);
 const topAnomalies = computed(() => anomalySummary.value?.top_anomalies || []);
 const filteredAnomalies = computed(() => {
   if (activeAnomalyType.value === "all") return topAnomalies.value;
@@ -46,6 +47,11 @@ const activeAnomalyProfile = computed(() => {
   if (activeAnomalyType.value === "all") return null;
   return anomalyTypeProfiles.value.find((item) => item.anomaly_type === activeAnomalyType.value) || null;
 });
+const activeSpatialSlice = computed(() => {
+  if (activeAnomalyType.value === "all") return null;
+  return anomalyTypeSpatialSlices.value.find((item) => item.anomaly_type === activeAnomalyType.value) || null;
+});
+const focusedHotspotKeys = computed(() => activeSpatialSlice.value?.top_hotspots.map((item) => item.grid_key) || []);
 
 const sortedCells = computed(() =>
   [...riskCells.value]
@@ -53,7 +59,17 @@ const sortedCells = computed(() =>
     .sort((left, right) => (right[activeLayer.value] || 0) - (left[activeLayer.value] || 0)),
 );
 
-const topCells = computed(() => sortedCells.value.slice(0, 8));
+const topCells = computed(() => {
+  if (!activeSpatialSlice.value) return sortedCells.value.slice(0, 8);
+  const cellsByKey = new Map(riskCells.value.map((cell) => [`${cell.grid_lat}-${cell.grid_lon}`, cell]));
+  return activeSpatialSlice.value.top_hotspots
+    .map((item) => {
+      const cell = cellsByKey.get(item.grid_key);
+      return cell ? { ...cell, slice_vessel_count: item.vessel_count, slice_anomaly_score_mean: item.anomaly_score_mean } : null;
+    })
+    .filter(Boolean)
+    .slice(0, 8);
+});
 
 const selectedHotspot = computed(() => {
   if (!sortedCells.value.length) return null;
@@ -74,7 +90,9 @@ const hotspotSummary = computed(() => {
 
 function selectLayer(layerKey) {
   activeLayer.value = layerKey;
-  if (sortedCells.value.length) {
+  if (activeSpatialSlice.value?.top_hotspots?.length) {
+    selectedHotspotKey.value = activeSpatialSlice.value.top_hotspots[0].grid_key;
+  } else if (sortedCells.value.length) {
     selectedHotspotKey.value = `${sortedCells.value[0].grid_lat}-${sortedCells.value[0].grid_lon}`;
   }
 }
@@ -96,6 +114,16 @@ function levelLabel(level) {
 
 function selectAnomalyType(typeKey) {
   activeAnomalyType.value = activeAnomalyType.value === typeKey ? "all" : typeKey;
+  if (activeAnomalyType.value === "all") {
+    if (sortedCells.value.length) {
+      selectedHotspotKey.value = `${sortedCells.value[0].grid_lat}-${sortedCells.value[0].grid_lon}`;
+    }
+    return;
+  }
+  const slice = anomalyTypeSpatialSlices.value.find((item) => item.anomaly_type === activeAnomalyType.value);
+  if (slice?.top_hotspots?.length) {
+    selectedHotspotKey.value = slice.top_hotspots[0].grid_key;
+  }
 }
 
 function vesselLinkTarget(mmsi) {
@@ -199,6 +227,8 @@ onMounted(async () => {
             :active-layer="activeLayer"
             :selected-hotspot-key="selectedHotspotKey"
             :reference-sites="referenceSites"
+            :focused-hotspot-keys="focusedHotspotKeys"
+            :focused-hotspot-label="activeSpatialSlice ? `${activeSpatialSlice.anomaly_type_label}空间热点` : ''"
             @select-hotspot="selectHotspot"
           />
         </article>
@@ -218,6 +248,22 @@ onMounted(async () => {
             </button>
           </article>
 
+          <article v-if="activeSpatialSlice" class="page-card list-card">
+            <div class="module-head">
+              <h4>
+                类型空间热点
+                <HintTooltip text="选择异常类型后，地图会强调该类型船舶更集中出现的热点格网，并让列表同步切换到对应空间区域。" />
+              </h4>
+              <span class="status-pill">{{ activeSpatialSlice.highlighted_cells }} 个格网</span>
+            </div>
+            <div class="list-row">
+              <div>
+                <strong>{{ activeSpatialSlice.anomaly_type_label }}</strong>
+                <span>{{ activeSpatialSlice.summary }}</span>
+              </div>
+            </div>
+          </article>
+
           <article v-if="selectedHotspot" class="page-card list-card">
             <div class="module-head">
               <h4>
@@ -231,6 +277,9 @@ onMounted(async () => {
                 <span>
                   {{ selectedHotspot.risk_level }} 风险，{{ selectedHotspot.vessel_count }} 艘船经过，
                   最近参考点 {{ selectedHotspot.nearest_reference_name || "暂无" }}
+                  <template v-if="activeSpatialSlice && focusedHotspotKeys.includes(`${selectedHotspot.grid_lat}-${selectedHotspot.grid_lon}`)">
+                    ，该格网属于当前异常类型的重点空间区域
+                  </template>
                 </span>
               </div>
               <div class="list-metric">
@@ -249,8 +298,8 @@ onMounted(async () => {
           <article class="page-card list-card">
             <div class="module-head">
               <h4>
-                热点格网列表
-                <HintTooltip text="列表与地图使用相同口径，切换视角后排序会同步更新。" />
+                {{ activeSpatialSlice ? "类型热点格网列表" : "热点格网列表" }}
+                <HintTooltip :text="activeSpatialSlice ? '当前列表已切换为所选异常类型更集中的热点格网。' : '列表与地图使用相同口径，切换视角后排序会同步更新。'" />
               </h4>
             </div>
             <button
@@ -263,11 +312,17 @@ onMounted(async () => {
             >
               <div>
                 <strong>{{ item.grid_lat }}, {{ item.grid_lon }}</strong>
-                <span>{{ item.risk_level }} 风险，{{ item.vessel_count }} 艘船经过</span>
+                <span>
+                  {{ item.risk_level }} 风险，{{ item.vessel_count }} 艘船经过
+                  <template v-if="activeSpatialSlice && item.slice_vessel_count">
+                    ，其中 {{ item.slice_vessel_count }} 艘属于当前异常类型
+                  </template>
+                </span>
               </div>
               <div class="list-metric">
                 <div>{{ layerMeta.shortLabel }} {{ item[activeLayer] }}</div>
-                <div>{{ item.traffic_points }} 点</div>
+                <div v-if="activeSpatialSlice && item.slice_anomaly_score_mean !== undefined">异常均值 {{ item.slice_anomaly_score_mean }}</div>
+                <div v-else>{{ item.traffic_points }} 点</div>
               </div>
             </button>
           </article>

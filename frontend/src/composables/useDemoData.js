@@ -204,6 +204,15 @@ function buildAnomalySummaryFallback() {
   const ranked = [...vessels.value]
     .filter((item) => item.fpi_proxy !== null && item.fpi_proxy !== undefined)
     .sort((left, right) => (right.fpi_proxy || 0) - (left.fpi_proxy || 0));
+  const fallbackHotspots = riskCells.value.slice(0, 6).map((cell) => ({
+    grid_key: `${cell.grid_lat}-${cell.grid_lon}`,
+    grid_lat: cell.grid_lat,
+    grid_lon: cell.grid_lon,
+    vessel_count: cell.vessel_count,
+    anomaly_score_mean: cell.rri_score,
+    rri_score: cell.rri_score,
+    risk_level: cell.risk_level,
+  }));
   return {
     window_label: summary.value?.window_label || "",
     vessel_count: vessels.value.length,
@@ -239,6 +248,40 @@ function buildAnomalySummaryFallback() {
           { metric_key: "mean_sst", metric_label: "平均海温暴露", type_mean: 28.3, normal_mean: 27.4, delta: 0.9, direction: "higher" },
           { metric_key: "mean_chlorophyll_a", metric_label: "平均叶绿素暴露", type_mean: 0.42, normal_mean: 0.23, delta: 0.19, direction: "higher" },
         ],
+      },
+    ],
+    anomaly_type_spatial_slices: [
+      {
+        anomaly_type: "long_dwell_low_speed",
+        anomaly_type_label: "闀挎椂浣庨€熷瀷",
+        vessel_count: Math.min(6, ranked.length),
+        highlighted_cells: fallbackHotspots.length,
+        summary: "鍥為€€鏍锋湰涓紝璇ョ被鍨嬩富瑕佸湪褰撳墠楂橀闄╂牸缃戝懆杈瑰嚭鐜帮紝鐢ㄤ簬淇濇寔鍦板浘浜や簰涓嶄腑鏂€?",
+        top_hotspots: fallbackHotspots,
+      },
+      {
+        anomaly_type: "warm_productive_water",
+        anomaly_type_label: "楂樻俯楂樺彾缁跨礌鍨?",
+        vessel_count: Math.min(4, Math.max(ranked.length - 6, 0)),
+        highlighted_cells: Math.max(fallbackHotspots.length - 2, 1),
+        summary: "鍥為€€鏍锋湰涓紝璇ョ被鍨嬩富瑕佽仛闆嗗湪姘村煙鏉′欢杈冧负绐佸嚭鐨勫尯鍩熴€?",
+        top_hotspots: fallbackHotspots.slice(0, 4),
+      },
+      {
+        anomaly_type: "mixed_anomaly",
+        anomaly_type_label: "娣峰悎寮傚父鍨?",
+        vessel_count: Math.max(Math.min(8, Math.max(ranked.length - 10, 0)), 0),
+        highlighted_cells: Math.max(fallbackHotspots.length - 1, 1),
+        summary: "鍥為€€鏍锋湰涓紝璇ョ被鍨嬪湪澶氱被椹卞姩鍥犵礌鍚屾椂鍋忕鐨勭儹鐐瑰尯鍩熸洿涓洪泦涓€?",
+        top_hotspots: fallbackHotspots.slice(0, 5),
+      },
+      {
+        anomaly_type: "sparse_observation",
+        anomaly_type_label: "瑙傛祴绋€鐤忓瀷",
+        vessel_count: 0,
+        highlighted_cells: Math.max(fallbackHotspots.length - 3, 1),
+        summary: "鍥為€€鏍锋湰涓紝璇ョ被鍨嬩富瑕佺敤浜庢彁绀鸿娴嬩笉瓒崇殑绌洪棿鍒嗗竷銆?",
+        top_hotspots: fallbackHotspots.slice(0, 3),
       },
     ],
     top_anomalies: ranked.slice(0, 12).map((item, index) => ({
