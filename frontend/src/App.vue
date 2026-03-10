@@ -19,7 +19,11 @@ function closeMethodDrawer() {
     <header class="site-header">
       <div class="brand-block">
         <p class="brand-kicker">Biofouling Intelligence Platform</p>
-        <h1>船舶生物污损分析平台</h1>
+        <h1>
+          船舶生物污损
+          <br />
+          分析平台
+        </h1>
         <p class="brand-text">
           平台基于 AIS 航迹与海洋环境数据，面向单船暴露诊断、区域风险识别与维护优先级判断提供可视化分析界面。
         </p>
