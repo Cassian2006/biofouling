@@ -73,3 +73,10 @@ def test_app_shell_exposes_method_entry() -> None:
 
     assert "核心算法" in app_shell
     assert "MethodDrawer" in app_shell
+    assert "brand-text--typewriter" in app_shell
+    assert "平台基于 AIS 航迹与海洋环境数据" not in app_shell
+    assert "单船污损诊断" in app_shell
+    assert "区域热点识别" in app_shell
+    assert "维护优先级判断" in app_shell
+    assert "FPI 短期趋势预测" in app_shell
+    assert "异常暴露类型识别" in app_shell
