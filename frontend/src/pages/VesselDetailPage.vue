@@ -248,6 +248,8 @@ const anomalyHeadline = computed(() => {
   };
 });
 
+const anomalyPeers = computed(() => vesselAnomaly.value?.peer_anomalies || []);
+
 const selectedTrendWindow = computed(() => {
   if (!vesselTrend.value?.windows?.length) return null;
   if (selectedTrendWindowIndex.value === null) return null;

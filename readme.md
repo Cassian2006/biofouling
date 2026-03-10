@@ -1823,3 +1823,14 @@ project/
 本轮验证结果：
 - `pytest`: `31 passed`
 - `frontend npm run build`: passed
+58. 2.0 运行修复：单船详情页加载问题（2026-03-10）
+本轮修复了单船详情页无法完成加载的前端运行时问题。根因不是后端接口响应慢，而是单船页模板中引用了 `anomalyPeers`，但脚本中没有定义该计算字段，导致页面在运行时直接抛出异常，进而让单船详情停留在加载状态。
+
+本轮处理内容：
+- 在单船页脚本中补齐 `anomalyPeers` 计算字段，统一从 `vesselAnomaly.peer_anomalies` 读取异常邻近对象。
+- 保持现有后端接口不变，仅修复前端运行时状态。
+- 补充前端回归断言，避免后续再次出现模板引用未定义变量的问题。
+
+本轮验证结果：
+- `pytest`: `32 passed`
+- `frontend npm run build`: passed
