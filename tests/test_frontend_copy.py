@@ -49,6 +49,8 @@ def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
     assert "长时低速型" in dashboard
     assert "观测稀疏型" in dashboard
     assert "异常类型对比" in dashboard
+    assert "正常均值" in dashboard
+    assert "综合风险分值" in dashboard
     assert "当前切片" in dashboard
     assert "anomalyType" in dashboard
     assert "focused-hotspot-keys" in dashboard
@@ -57,11 +59,12 @@ def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
     assert "VesselTrackMap" in vessel
     assert "selector-input" in vessel
     assert "简要结论" in vessel
-    assert "历史-当前-预测链路" in vessel
+    assert "历史-预测链路" in vessel
     assert "主导证据" in vessel
     assert "联动时间窗" in vessel
     assert "清除联动" in vessel
     assert "当前页面从" in vessel
+    assert "相邻优先级对象" not in vessel
     assert "定位全轨迹" in read_text("frontend/src/components/VesselTrackMap.vue")
 
     assert 'redirect: "/"' in router
@@ -75,8 +78,8 @@ def test_app_shell_exposes_method_entry() -> None:
     assert "MethodDrawer" in app_shell
     assert "brand-text--typewriter" in app_shell
     assert "平台基于 AIS 航迹与海洋环境数据" not in app_shell
-    assert "单船污损诊断" in app_shell
-    assert "区域热点识别" in app_shell
-    assert "维护优先级判断" in app_shell
-    assert "FPI 短期趋势预测" in app_shell
-    assert "异常暴露类型识别" in app_shell
+    assert "单船画像-污损诊断" in app_shell
+    assert "区域热点识别-标记" in app_shell
+    assert "维护优先级评估" in app_shell
+    assert "异常类型暴露" in app_shell
+    assert "typewriter-line" in app_shell

@@ -5,11 +5,10 @@ import MethodDrawer from "./components/MethodDrawer.vue";
 
 const methodDrawerOpen = ref(false);
 const heroPhrases = [
-  "单船污损诊断",
-  "区域热点识别",
-  "维护优先级判断",
-  "FPI 短期趋势预测",
-  "异常暴露类型识别",
+  "单船画像-污损诊断",
+  "区域热点识别-标记",
+  "维护优先级评估",
+  "异常类型暴露",
 ];
 const typedHeroText = ref("");
 
@@ -80,9 +79,11 @@ onBeforeUnmount(() => {
           分析平台
         </h1>
         <p class="brand-text brand-text--typewriter" aria-live="polite">
-          <span class="typewriter-prefix">平台能力：</span>
-          <span class="typewriter-text">{{ typedHeroText }}</span>
-          <span class="typewriter-caret" aria-hidden="true"></span>
+          <span class="typewriter-line">
+            <span class="typewriter-prefix">平台能力：</span>
+            <span class="typewriter-text">{{ typedHeroText }}</span>
+            <span class="typewriter-caret" aria-hidden="true"></span>
+          </span>
         </p>
       </div>
 

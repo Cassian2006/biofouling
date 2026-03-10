@@ -25,10 +25,17 @@ const selectedHotspotKey = ref("");
 const activeAnomalyType = ref("all");
 
 const layerOptions = [
-  { key: "rri_score", title: "综合风险", shortLabel: "RRI" },
+  { key: "rri_score", title: "综合风险", shortLabel: "总分" },
   { key: "traffic_score", title: "交通疏密", shortLabel: "交通" },
   { key: "low_speed_score", title: "低速停留", shortLabel: "停留" },
   { key: "environment_score", title: "水域情况", shortLabel: "水域" },
+];
+
+const overviewHighlights = [
+  { title: "单船画像", description: "快速查看单船暴露结构、异常类型与维护建议。" },
+  { title: "区域热点", description: "定位研究区内更值得优先审阅的空间格网。" },
+  { title: "短期预测", description: "结合近期窗口序列判断下一时间窗的风险走向。" },
+  { title: "异常筛查", description: "识别与常规样本差异更显著的船舶对象。" },
 ];
 
 const topVessels = computed(() => vessels.value.slice(0, 8));
@@ -81,12 +88,31 @@ const hotspotSummary = computed(() => {
   const cell = selectedHotspot.value;
   if (!cell) return [];
   return [
-    { label: "综合风险", value: cell.rri_score },
+    { label: "综合风险分值", value: cell.rri_score },
     { label: "交通疏密", value: cell.traffic_score },
     { label: "低速停留", value: cell.low_speed_score },
     { label: "水域情况", value: cell.environment_score },
   ];
 });
+
+const anomalyBaselineDescription =
+  "这里的“正常均值”来自当前时间窗内 anomaly_level = normal 且观测充分的船舶样本，用作对照基线。";
+
+function formatMetricDifference(metric) {
+  if (metric.delta === null || metric.delta === undefined || metric.normal_mean === null || metric.normal_mean === undefined) {
+    return "当前缺少可比基线";
+  }
+  if (Math.abs(metric.normal_mean) < 0.0001) {
+    return metric.direction === "flat" ? "与正常样本接近" : `较正常样本偏移 ${metric.delta}`;
+  }
+  const percent = Math.abs((metric.delta / metric.normal_mean) * 100);
+  if (percent < 2 || metric.direction === "flat") {
+    return "与正常均值接近";
+  }
+  return metric.direction === "higher"
+    ? `超出正常均值 ${percent.toFixed(0)}%`
+    : `低于正常均值 ${percent.toFixed(0)}%`;
+}
 
 function selectLayer(layerKey) {
   activeLayer.value = layerKey;
@@ -161,9 +187,12 @@ onMounted(async () => {
       <article class="page-card hero-copy-card">
         <p class="section-kicker">Overview</p>
         <h2>新加坡海峡船舶生物污损风险总览</h2>
-        <p class="support-text">
-          平台基于 AIS 航迹与海洋环境数据，对研究区内空间热点、重点船舶和维护优先级进行统一展示。
-        </p>
+        <div class="hero-capability-list">
+          <div v-for="item in overviewHighlights" :key="item.title" class="hero-capability-chip">
+            <strong>{{ item.title }}</strong>
+            <span>{{ item.description }}</span>
+          </div>
+        </div>
       </article>
 
       <article class="page-card summary-stack">
@@ -193,7 +222,7 @@ onMounted(async () => {
       <article class="page-card stat-card">
         <span class="stat-label">高风险格网</span>
         <strong class="stat-value">{{ summary.high_risk_cells }}</strong>
-        <p>代表当前时间窗内风险水平最高的空间热点。</p>
+        <p>当前时间窗内风险水平最高的空间热点。</p>
       </article>
       <article class="page-card stat-card">
         <span class="stat-label">中风险格网</span>
@@ -208,7 +237,6 @@ onMounted(async () => {
       <article class="page-card stat-card">
         <span class="stat-label">高度异常船舶</span>
         <strong class="stat-value">{{ anomalyCounts.highly_abnormal || 0 }}</strong>
-        <p>暴露模式与同批对象差异最大的那一批船。</p>
       </article>
     </section>
 
@@ -217,7 +245,7 @@ onMounted(async () => {
         <p class="section-kicker">Spatial View</p>
         <h3>
           区域主地图
-          <HintTooltip text="地图用于识别空间风险，并区分热点主要由交通疏密、低速停留或水域情况驱动。" />
+          <HintTooltip text="地图用于识别空间风险，并区分热点主要由交通疏密、低速停留或水域情况驱动。综合风险分值表示该格网的总体风险水平。" />
         </h3>
       </div>
       <div class="split-grid detail-layout dashboard-map-layout">
@@ -284,7 +312,7 @@ onMounted(async () => {
               </div>
               <div class="list-metric">
                 <div>{{ layerMeta.shortLabel }} {{ selectedHotspot[activeLayer] }}</div>
-                <div>RRI {{ selectedHotspot.rri_score }}</div>
+                <div>综合风险分值 {{ selectedHotspot.rri_score }}</div>
               </div>
             </div>
             <div v-for="item in hotspotSummary" :key="item.label" class="list-row hotspot-row">
@@ -431,6 +459,7 @@ onMounted(async () => {
           异常类型对比
           <HintTooltip text="将各类异常对象与正常船舶做对比，帮助理解每类异常最突出的偏离指标。" />
         </h3>
+        <p class="support-text">{{ anomalyBaselineDescription }}</p>
       </div>
       <div class="card-grid anomaly-profile-grid">
         <article
@@ -449,15 +478,7 @@ onMounted(async () => {
             <div v-for="metric in profile.key_metrics" :key="metric.metric_key" class="signal-chip">
               <strong>{{ metric.metric_label }}</strong>
               <span>类型均值 {{ metric.type_mean ?? "暂无" }} · 正常均值 {{ metric.normal_mean ?? "暂无" }}</span>
-              <small>
-                {{
-                  metric.direction === "higher"
-                    ? `较正常船偏高 ${metric.delta}`
-                    : metric.direction === "lower"
-                      ? `较正常船偏低 ${Math.abs(metric.delta)}`
-                      : "与正常船差异较小"
-                }}
-              </small>
+              <small>{{ formatMetricDifference(metric) }}</small>
             </div>
           </div>
         </article>

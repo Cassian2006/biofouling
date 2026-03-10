@@ -43,6 +43,12 @@ const bounds = [
   [1.85, 104.9],
 ];
 const DISPLAY_SUBDIVISIONS = 1;
+const LAYER_LABELS = {
+  rri_score: "综合风险分值",
+  traffic_score: "交通疏密",
+  low_speed_score: "低速停留",
+  environment_score: "水域情况",
+};
 
 const cellsByKey = computed(() =>
   new Map(props.cells.map((cell) => [`${cell.grid_lat}-${cell.grid_lon}`, cell])),
@@ -139,7 +145,7 @@ function renderMap() {
       });
       rectangle.on("click", () => emit("select-hotspot", key));
       rectangle.bindTooltip(
-        `${cell.grid_lat}, ${cell.grid_lon}<br>${props.activeLayer}: ${value.toFixed(3)}<br>RRI: ${Number(cell.rri_score || 0).toFixed(3)}${isFocused ? "<br>当前异常类型相关热点" : ""}`,
+        `${cell.grid_lat}, ${cell.grid_lon}<br>${LAYER_LABELS[props.activeLayer] || props.activeLayer}: ${value.toFixed(3)}<br>综合风险分值: ${Number(cell.rri_score || 0).toFixed(3)}${isFocused ? "<br>当前异常类型相关热点" : ""}`,
         { sticky: true },
       );
       rectangle.addTo(gridLayer);
