@@ -397,89 +397,37 @@ const trendSummary = computed(() => {
   return `当前共划分 ${vesselTrend.value.windows.length} 个历史窗口，累计 ${pointTotal} 个 AIS 点；平均航速在 ${speedMin.toFixed(3)} ~ ${speedMax.toFixed(3)} 节之间，低速停留均值约为 ${(lowSpeedMean * 100).toFixed(0)}%。`;
 });
 
-const svgTrend = computed(() => {
-  if (!vesselTrend.value?.windows?.length) return null;
+const trendWindowCards = computed(() => {
+  if (!vesselTrend.value?.windows?.length) return [];
 
-  const width = 920;
-  const height = 360;
-  const paddingLeft = 54;
-  const paddingRight = 54;
-  const topPadding = 24;
-  const bottomPadding = 56;
-  const innerWidth = width - paddingLeft - paddingRight;
-  const innerHeight = height - topPadding - bottomPadding;
   const windows = vesselTrend.value.windows;
-  const sogValues = windows.map((item) => item.mean_sog ?? 0);
-  const ratioValues = windows.map((item) => item.low_speed_ratio ?? 0);
-  const sogMinRaw = Math.min(...sogValues);
-  const sogMaxRaw = Math.max(...sogValues);
-  const ratioMinRaw = Math.min(...ratioValues);
-  const ratioMaxRaw = Math.max(...ratioValues);
-  const sogSpan = Math.max(sogMaxRaw - sogMinRaw, 0.08);
-  const ratioSpan = Math.max(ratioMaxRaw - ratioMinRaw, 0.04);
-  const sogPadding = Math.max(sogSpan * 0.8, 0.18);
-  const ratioPadding = Math.max(ratioSpan * 0.8, 0.04);
-  const sogMin = Math.max(0, sogMinRaw - sogPadding);
-  const sogMax = sogMaxRaw + sogPadding;
-  const ratioMin = Math.max(0, ratioMinRaw - ratioPadding);
-  const ratioMax = ratioMaxRaw + ratioPadding;
   const maxPointCount = Math.max(vesselTrend.value.max_point_count || 1, 1);
+  const maxMeanSog = Math.max(...windows.map((item) => item.mean_sog ?? 0), 0.1);
 
-  const projectX = (index) => {
-    if (windows.length === 1) return width / 2;
-    return paddingLeft + (index / (windows.length - 1)) * innerWidth;
-  };
+  return windows.map((item, index) => {
+    const lowSpeedRatio = item.low_speed_ratio ?? 0;
+    const meanSog = item.mean_sog ?? 0;
+    const windowStart = new Date(item.window_start);
+    const windowEnd = new Date(windowStart.getTime() + vesselTrend.value.interval_hours * 3600 * 1000);
 
-  const projectSogY = (value) =>
-    topPadding + innerHeight - ((((value ?? sogMin) - sogMin) / Math.max(sogMax - sogMin, 0.01)) * innerHeight);
-  const projectLowSpeedY = (value) =>
-    topPadding + innerHeight - ((((value ?? ratioMin) - ratioMin) / Math.max(ratioMax - ratioMin, 0.01)) * innerHeight);
-
-  const speedPath = windows
-    .map((item, index) => `${index === 0 ? "M" : "L"} ${projectX(index).toFixed(2)} ${projectSogY(item.mean_sog).toFixed(2)}`)
-    .join(" ");
-
-  const lowSpeedPath = windows
-    .map((item, index) => `${index === 0 ? "M" : "L"} ${projectX(index).toFixed(2)} ${projectLowSpeedY(item.low_speed_ratio).toFixed(2)}`)
-    .join(" ");
-
-  const bars = windows.map((item, index) => {
-    const x = projectX(index) - 12;
-    const barHeight = ((item.point_count || 0) / maxPointCount) * innerHeight;
     return {
+      index,
       label: item.window_start.slice(5, 16).replace("T", " "),
-      x,
-      y: topPadding + innerHeight - barHeight,
-      width: 24,
-      height: barHeight,
-      cx: projectX(index),
-      sogY: projectSogY(item.mean_sog),
-      lowSpeedY: projectLowSpeedY(item.low_speed_ratio),
+      windowRange: `${windowStart.toISOString().slice(5, 16).replace("T", " ")} - ${windowEnd
+        .toISOString()
+        .slice(11, 16)}`,
+      pointCount: item.point_count,
+      pointFill: `${Math.max(((item.point_count || 0) / maxPointCount) * 100, 6)}%`,
+      meanSog,
+      speedFill: `${Math.max((meanSog / maxMeanSog) * 100, meanSog > 0 ? 8 : 0)}%`,
+      lowSpeedRatio,
+      lowSpeedPercent: `${Math.round(lowSpeedRatio * 100)}%`,
+      isSelected: selectedTrendWindowIndex.value === index,
     };
   });
-
-  const speedAxis = [sogMin, (sogMin + sogMax) / 2, sogMax].map((value) => ({
-    value: value.toFixed(3),
-    y: projectSogY(value),
-  }));
-
-  const ratioAxis = [ratioMin, (ratioMin + ratioMax) / 2, ratioMax].map((value) => ({
-    value: `${Math.round(Math.min(Math.max(value, 0), 1) * 100)}%`,
-    y: projectLowSpeedY(value),
-  }));
-
-  return {
-    width,
-    height,
-    bars,
-    speedPath,
-    lowSpeedPath,
-    speedAxis,
-    ratioAxis,
-    paddingLeft,
-    paddingRight,
-  };
 });
+
+const svgTrend = computed(() => null);
 
 function onSelectMmsi(event) {
   const nextValue = event.target.value;
@@ -962,7 +910,57 @@ watch(
             <button v-if="selectedTrendWindow" type="button" class="trend-reset-button" @click="selectedTrendWindowIndex = null">清除联动</button>
           </div>
         </div>
-        <div v-if="svgTrend" class="trend-stage">
+        <div v-if="trendWindowCards.length" class="trend-stage">
+          <div class="trend-window-grid">
+            <button
+              v-for="item in trendWindowCards"
+              :key="item.windowRange"
+              type="button"
+              class="trend-window-card"
+              :class="{ 'trend-window-card--active': item.isSelected }"
+              @click="onSelectTrendWindow(item.index)"
+            >
+              <div class="trend-window-head">
+                <strong>{{ item.label }}</strong>
+                <span>{{ item.windowRange }}</span>
+              </div>
+              <div class="trend-window-metric">
+                <div class="trend-window-label-row">
+                  <span>AIS 点数</span>
+                  <strong>{{ item.pointCount }}</strong>
+                </div>
+                <div class="trend-window-bar">
+                  <div class="trend-window-fill trend-window-fill--points" :style="{ width: item.pointFill }"></div>
+                </div>
+              </div>
+              <div class="trend-window-metric">
+                <div class="trend-window-label-row">
+                  <span>平均航速</span>
+                  <strong>{{ item.meanSog.toFixed(3) }} 节</strong>
+                </div>
+                <div class="trend-window-bar">
+                  <div class="trend-window-fill trend-window-fill--speed" :style="{ width: item.speedFill }"></div>
+                </div>
+              </div>
+              <div class="trend-window-metric">
+                <div class="trend-window-label-row">
+                  <span>低速停留</span>
+                  <strong>{{ item.lowSpeedPercent }}</strong>
+                </div>
+                <div class="trend-window-bar">
+                  <div class="trend-window-fill trend-window-fill--slow" :style="{ width: item.lowSpeedPercent }"></div>
+                </div>
+              </div>
+            </button>
+          </div>
+          <div class="trend-legend">
+            <span><i class="legend-swatch legend-swatch--bar"></i> AIS 点数越长，表示该时间窗记录越密</span>
+            <span><i class="legend-swatch legend-swatch--speed"></i> 平均航速按当前对象的历史窗口相对比较</span>
+            <span><i class="legend-swatch legend-swatch--slow"></i> 低速停留直接显示该时间窗内的占比</span>
+          </div>
+          <p class="trend-note">{{ trendSummary }}</p>
+        </div>
+        <div v-else-if="false" class="trend-stage">
           <svg :viewBox="`0 0 ${svgTrend.width} ${svgTrend.height}`" class="trend-svg" role="img" aria-label="单船时间趋势图">
             <rect x="0" y="0" :width="svgTrend.width" :height="svgTrend.height" rx="18" class="trend-bg" />
             <line

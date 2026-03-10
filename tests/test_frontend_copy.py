@@ -59,6 +59,8 @@ def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
     assert "VesselTrackMap" in vessel
     assert "selector-input" in vessel
     assert "const anomalyPeers = computed(() => vesselAnomaly.value?.peer_anomalies || [])" in vessel
+    assert "const trendWindowCards = computed(() => {" in vessel
+    assert "trend-window-grid" in vessel
     assert "简要结论" in vessel
     assert "历史-预测链路" in vessel
     assert "主导证据" in vessel
