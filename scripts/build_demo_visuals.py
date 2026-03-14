@@ -34,6 +34,14 @@ def load_csv(path: Path) -> pd.DataFrame:
     return dataframe
 
 
+def window_label_from_features_path(path: Path) -> str:
+    stem = path.stem.replace("vessel_features_", "")
+    parts = stem.split("_")
+    if len(parts) >= 2:
+        return f"{parts[0]} 至 {parts[1]}"
+    return stem
+
+
 def build_map(ais: pd.DataFrame, features: pd.DataFrame, risk: pd.DataFrame, output_dir: Path) -> Path:
     center = [1.28, 103.85]
     fmap = folium.Map(location=center, zoom_start=10, tiles="CartoDB positron")
@@ -168,6 +176,7 @@ def build_dashboard(
     rec_chart_path: Path,
     top_chart_path: Path,
     output_dir: Path,
+    window_label: str,
 ) -> Path:
     top_vessel = features.sort_values("fpi_proxy", ascending=False).iloc[0]
     top_vessels = features.sort_values("fpi_proxy", ascending=False).head(5)
@@ -293,7 +302,7 @@ def build_dashboard(
         </p>
       </div>
       <div class="panel hero-panel">
-        <div class="hero-metric"><span>当前测试时间窗</span><strong>2026-01-15 至 2026-01-18</strong></div>
+        <div class="hero-metric"><span>当前测试时间窗</span><strong>{window_label}</strong></div>
         <div class="hero-metric"><span>已汇总船舶</span><strong>{len(features)}</strong></div>
         <div class="hero-metric"><span>区域格网单元</span><strong>{len(risk)}</strong></div>
         <div class="hero-metric"><span>当前最高风险船舶</span><strong>{top_vessel.mmsi}</strong></div>
@@ -413,7 +422,7 @@ def build_dashboard(
       <p class="eyebrow">当前测试窗摘要</p>
       <h2>把现阶段的演示条件说清楚</h2>
       <div class="section-card summary-box">
-        <p>时间窗：2026-01-15 至 2026-01-18</p>
+        <p>时间窗：{window_label}</p>
         <p>空间范围：新加坡海峡及周边固定 bbox</p>
         <p>当前环境变量：海温（thetao）与叶绿素（chl）</p>
         <p>当前页面的目标：说明系统未来要展示什么，而不是一次性做完所有交互功能。</p>
@@ -435,14 +444,16 @@ def main() -> None:
 
     sns.set_theme(style="whitegrid")
     ais = load_csv(Path(args.ais))
-    features = load_csv(Path(args.features))
+    features_path = Path(args.features)
+    features = load_csv(features_path)
     risk = load_csv(Path(args.risk))
+    window_label = window_label_from_features_path(features_path)
 
     map_path = build_map(ais, features, risk, output_dir)
     rec_chart_path = build_recommendation_chart(features, output_dir)
     top_chart_path = build_top_vessel_chart(features, output_dir)
     dashboard_path = build_dashboard(
-        features, risk, map_path, rec_chart_path, top_chart_path, output_dir
+        features, risk, map_path, rec_chart_path, top_chart_path, output_dir, window_label
     )
 
     print(f"Demo dashboard written to: {dashboard_path.resolve()}")

@@ -1,0 +1,39 @@
+{
+  "version": "competition_main_v1",
+  "status": "frozen",
+  "frozen_on": "2026-03-14",
+  "window_label": "20260115 to 20260130",
+  "description": "Frozen 15-day competition baseline used for judging demos, screenshots, and public API outputs.",
+  "artifacts": {
+    "processed_ais": "data/processed/ais_20260115_20260130_cleaned.csv",
+    "processed_env": "data/processed/env_20260115_20260130.csv",
+    "vessel_features": "data/processed/vessel_features_20260115_20260130.csv",
+    "regional_risk": "outputs/maps/regional_risk_20260115_20260130.csv",
+    "voyage_report": "outputs/reports/voyage_report_20260115_20260130.md",
+    "reference_sites": "data/reference/singapore_reference_sites.csv",
+    "frontend_summary": "frontend/public/demo/summary.json",
+    "frontend_vessels": "frontend/public/demo/vessels.json",
+    "frontend_risk_cells": "frontend/public/demo/risk_cells.json",
+    "frontend_demo_dashboard": "frontend/public/demo/demo_dashboard.html",
+    "frontend_demo_map": "frontend/public/demo/regional_demo_map.html",
+    "frontend_demo_recommendation_chart": "frontend/public/demo/recommendation_breakdown.png",
+    "frontend_demo_top_vessels_chart": "frontend/public/demo/top_vessels_fpi.png"
+  },
+  "expected_summary": {
+    "vessels_summarized": 637,
+    "grid_cells": 1143,
+    "high_risk_cells": 1,
+    "medium_risk_cells": 78,
+    "recommendation_counts": {
+      "Prioritize cleaning assessment": 284,
+      "Monitor exposure trend": 340,
+      "Low immediate concern": 13
+    },
+    "anomaly_level_counts": {
+      "highly_abnormal": 16,
+      "suspicious": 70,
+      "normal": 400,
+      "observation_insufficient": 151
+    }
+  }
+}

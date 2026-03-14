@@ -1866,3 +1866,39 @@ project/
     - 异常检测与时序预测的科学性边界
     - 当前模型更适合用于相对排序还是绝对判断
   - 当前状态：列为优先开发内容，但暂不执行。
+
+61. 竞赛主版本冻结（2026-03-14）
+当前已经将稳定跑通的 `15 天` 链路冻结为竞赛展示主版本，固定窗口为 `20260115 to 20260130`。
+
+冻结规则：
+- 以 `config/competition_baseline.json` 作为唯一基线清单。
+- 后端 demo 接口优先读取该清单，而不是自动选择“最新文件”。
+- 前端静态回退数据、演示地图和汇报数字都以这套基线为准。
+- 后续新增时间窗或升级分析结果时，不覆盖该基线，只新增新的 baseline。
+
+当前冻结的核心文件：
+- `data/processed/ais_20260115_20260130_cleaned.csv`
+- `data/processed/env_20260115_20260130.csv`
+- `data/processed/vessel_features_20260115_20260130.csv`
+- `outputs/maps/regional_risk_20260115_20260130.csv`
+- `outputs/reports/voyage_report_20260115_20260130.md`
+- `frontend/public/demo/summary.json`
+- `frontend/public/demo/vessels.json`
+- `frontend/public/demo/risk_cells.json`
+
+当前冻结摘要：
+- `vessels_summarized = 637`
+- `grid_cells = 1143`
+- `high_risk_cells = 1`
+- `medium_risk_cells = 78`
+- recommendation 分布：
+  - `Prioritize cleaning assessment = 284`
+  - `Monitor exposure trend = 340`
+  - `Low immediate concern = 13`
+- anomaly 分布：
+  - `highly_abnormal = 16`
+  - `suspicious = 70`
+  - `normal = 400`
+  - `observation_insufficient = 151`
+
+详细说明见 `docs/competition_baseline.md`。

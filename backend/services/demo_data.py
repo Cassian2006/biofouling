@@ -1,3 +1,4 @@
+import json
 from functools import lru_cache
 from pathlib import Path
 
@@ -26,11 +27,13 @@ from scripts.summarize_validation_events import load_validation_events, summariz
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+CONFIG_DIR = PROJECT_ROOT / "config"
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 EXTERNAL_DIR = PROJECT_ROOT / "data" / "external"
 REFERENCE_DIR = PROJECT_ROOT / "data" / "reference"
 MAPS_DIR = PROJECT_ROOT / "outputs" / "maps"
 REPORTS_DIR = PROJECT_ROOT / "outputs" / "reports"
+COMPETITION_BASELINE_PATH = CONFIG_DIR / "competition_baseline.json"
 
 
 def _latest_file(directory: Path, pattern: str) -> Path:
@@ -44,6 +47,10 @@ def _load_csv(path: Path) -> pd.DataFrame:
     dataframe = pd.read_csv(path)
     dataframe.columns = [column.strip().lower() for column in dataframe.columns]
     return dataframe
+
+
+def _load_json(path: Path) -> dict[str, object]:
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _load_ais_csv(path: Path) -> pd.DataFrame:
@@ -62,8 +69,8 @@ def _optional_latest_file(directory: Path, pattern: str) -> Path | None:
     return matches[-1]
 
 
-def _load_reference_sites() -> pd.DataFrame:
-    path = REFERENCE_DIR / "singapore_reference_sites.csv"
+def _load_reference_sites(path: Path | None = None) -> pd.DataFrame:
+    path = path or (REFERENCE_DIR / "singapore_reference_sites.csv")
     if not path.exists():
         return pd.DataFrame(
             columns=["site_id", "name", "site_type", "zone", "latitude", "longitude", "description"]
@@ -238,29 +245,36 @@ def _build_fallback_report_lines(vessel: VesselRecord) -> list[str]:
     ]
 
 
-def _load_vessel_catalog(ais: pd.DataFrame) -> pd.DataFrame:
-    catalog_path = _optional_latest_file(PROCESSED_DIR, "vessel_catalog*.csv")
+def _load_vessel_catalog(
+    ais: pd.DataFrame,
+    catalog_path: Path | None = None,
+    static_path: Path | None = None,
+) -> pd.DataFrame:
+    catalog_path = catalog_path or _optional_latest_file(PROCESSED_DIR, "vessel_catalog*.csv")
     if catalog_path:
         catalog = _load_csv(catalog_path)
         catalog["mmsi"] = catalog["mmsi"].astype(str)
         return catalog
 
     derived = build_ais_derived_catalog(ais)
-    static_path = _optional_latest_file(EXTERNAL_DIR, "vessel_static*.csv")
+    static_path = static_path or _optional_latest_file(EXTERNAL_DIR, "vessel_static*.csv")
     if static_path:
         static_profiles = load_static_profiles(static_path)
         return merge_static_profiles(derived, static_profiles)
     return derived
 
 
-def _load_validation_summary() -> pd.DataFrame:
-    validation_summary_path = _optional_latest_file(PROCESSED_DIR, "validation_summary*.csv")
+def _load_validation_summary(
+    validation_summary_path: Path | None = None,
+    validation_events_path: Path | None = None,
+) -> pd.DataFrame:
+    validation_summary_path = validation_summary_path or _optional_latest_file(PROCESSED_DIR, "validation_summary*.csv")
     if validation_summary_path:
         summary = _load_csv(validation_summary_path)
         summary["mmsi"] = summary["mmsi"].astype(str)
         return summary
 
-    validation_events_path = _optional_latest_file(EXTERNAL_DIR, "validation_events*.csv")
+    validation_events_path = validation_events_path or _optional_latest_file(EXTERNAL_DIR, "validation_events*.csv")
     if validation_events_path:
         events = load_validation_events(validation_events_path)
         summary = summarize_validation_events(events)
@@ -363,29 +377,90 @@ def _downsample_track(track: pd.DataFrame, max_points: int = 320) -> pd.DataFram
     return track.iloc[indices].copy()
 
 
+def get_competition_baseline_manifest() -> dict[str, object]:
+    manifest = _load_json(COMPETITION_BASELINE_PATH)
+    artifacts = manifest.get("artifacts", {})
+    if not isinstance(artifacts, dict):
+        raise ValueError(f"Invalid competition baseline artifacts in {COMPETITION_BASELINE_PATH}")
+
+    resolved_artifacts: dict[str, str] = {}
+    for name, relative_path in artifacts.items():
+        if relative_path in (None, ""):
+            continue
+        artifact_path = (PROJECT_ROOT / str(relative_path)).resolve()
+        if not artifact_path.exists():
+            raise FileNotFoundError(
+                f"Competition baseline artifact '{name}' is missing: {artifact_path}"
+            )
+        resolved_artifacts[name] = str(artifact_path)
+
+    manifest["resolved_artifacts"] = resolved_artifacts
+    return manifest
+
+
+def _demo_source_bundle() -> dict[str, object]:
+    if COMPETITION_BASELINE_PATH.exists():
+        manifest = get_competition_baseline_manifest()
+        artifacts = manifest["resolved_artifacts"]  # type: ignore[assignment]
+        return {
+            "source_mode": "competition_baseline",
+            "baseline_version": manifest.get("version"),
+            "manifest_path": COMPETITION_BASELINE_PATH,
+            "window_label": str(manifest.get("window_label") or ""),
+            "features_path": Path(artifacts["vessel_features"]),
+            "risk_path": Path(artifacts["regional_risk"]),
+            "report_path": Path(artifacts["voyage_report"]),
+            "ais_path": Path(artifacts["processed_ais"]),
+            "reference_path": Path(artifacts["reference_sites"]),
+            "catalog_path": Path(artifacts["vessel_catalog"]) if "vessel_catalog" in artifacts else None,
+            "static_path": Path(artifacts["vessel_static"]) if "vessel_static" in artifacts else None,
+            "validation_summary_path": (
+                Path(artifacts["validation_summary"]) if "validation_summary" in artifacts else None
+            ),
+            "validation_events_path": (
+                Path(artifacts["validation_events"]) if "validation_events" in artifacts else None
+            ),
+        }
+
+    return {
+        "source_mode": "latest_files",
+        "baseline_version": None,
+        "manifest_path": None,
+        "features_path": _latest_file(PROCESSED_DIR, "vessel_features_*.csv"),
+        "risk_path": _latest_file(MAPS_DIR, "regional_risk_*.csv"),
+        "report_path": _latest_file(REPORTS_DIR, "voyage_report_*.md"),
+        "ais_path": _latest_file(PROCESSED_DIR, "ais_*_cleaned.csv"),
+        "reference_path": REFERENCE_DIR / "singapore_reference_sites.csv",
+        "catalog_path": _optional_latest_file(PROCESSED_DIR, "vessel_catalog*.csv"),
+        "static_path": _optional_latest_file(EXTERNAL_DIR, "vessel_static*.csv"),
+        "validation_summary_path": _optional_latest_file(PROCESSED_DIR, "validation_summary*.csv"),
+        "validation_events_path": _optional_latest_file(EXTERNAL_DIR, "validation_events*.csv"),
+    }
+
+
 def _demo_payload_signature() -> tuple[str, ...]:
-    features_path = _latest_file(PROCESSED_DIR, "vessel_features_*.csv")
-    risk_path = _latest_file(MAPS_DIR, "regional_risk_*.csv")
-    report_path = _latest_file(REPORTS_DIR, "voyage_report_*.md")
-    ais_path = _latest_file(PROCESSED_DIR, "ais_*_cleaned.csv")
-
-    signature_items = [
-        features_path,
-        risk_path,
-        report_path,
-        ais_path,
+    source_bundle = _demo_source_bundle()
+    signature_items: list[Path] = [
+        source_bundle["features_path"],  # type: ignore[list-item]
+        source_bundle["risk_path"],  # type: ignore[list-item]
+        source_bundle["report_path"],  # type: ignore[list-item]
+        source_bundle["ais_path"],  # type: ignore[list-item]
+        source_bundle["reference_path"],  # type: ignore[list-item]
     ]
 
-    optional_paths = [
-        _optional_latest_file(PROCESSED_DIR, "vessel_catalog*.csv"),
-        _optional_latest_file(PROCESSED_DIR, "validation_summary*.csv"),
-        _optional_latest_file(EXTERNAL_DIR, "vessel_static*.csv"),
-        _optional_latest_file(EXTERNAL_DIR, "validation_events*.csv"),
-        REFERENCE_DIR / "singapore_reference_sites.csv",
-    ]
+    manifest_path = source_bundle.get("manifest_path")
+    if isinstance(manifest_path, Path) and manifest_path.exists():
+        signature_items.append(manifest_path)
 
-    for optional_path in optional_paths:
-        if optional_path and optional_path.exists():
+    optional_keys = [
+        "catalog_path",
+        "validation_summary_path",
+        "static_path",
+        "validation_events_path",
+    ]
+    for key in optional_keys:
+        optional_path = source_bundle.get(key)
+        if isinstance(optional_path, Path) and optional_path.exists():
             signature_items.append(optional_path)
 
     return tuple(
@@ -396,20 +471,29 @@ def _demo_payload_signature() -> tuple[str, ...]:
 
 @lru_cache(maxsize=4)
 def _load_demo_payload_by_signature(signature: tuple[str, ...]) -> dict[str, object]:
-    features_path = _latest_file(PROCESSED_DIR, "vessel_features_*.csv")
-    risk_path = _latest_file(MAPS_DIR, "regional_risk_*.csv")
-    report_path = _latest_file(REPORTS_DIR, "voyage_report_*.md")
-    ais_path = _latest_file(PROCESSED_DIR, "ais_*_cleaned.csv")
+    source_bundle = _demo_source_bundle()
+    features_path = source_bundle["features_path"]  # type: ignore[assignment]
+    risk_path = source_bundle["risk_path"]  # type: ignore[assignment]
+    report_path = source_bundle["report_path"]  # type: ignore[assignment]
+    ais_path = source_bundle["ais_path"]  # type: ignore[assignment]
+    reference_path = source_bundle["reference_path"]  # type: ignore[assignment]
 
     features = _load_csv(features_path)
     risk = _load_csv(risk_path)
     ais = _load_ais_csv(ais_path)
-    vessel_catalog = _load_vessel_catalog(ais)
-    validation_summary = _load_validation_summary()
-    reference_sites = _serialize_reference_sites(_load_reference_sites())
+    vessel_catalog = _load_vessel_catalog(
+        ais,
+        catalog_path=source_bundle.get("catalog_path"),  # type: ignore[arg-type]
+        static_path=source_bundle.get("static_path"),  # type: ignore[arg-type]
+    )
+    validation_summary = _load_validation_summary(
+        validation_summary_path=source_bundle.get("validation_summary_path"),  # type: ignore[arg-type]
+        validation_events_path=source_bundle.get("validation_events_path"),  # type: ignore[arg-type]
+    )
+    reference_sites = _serialize_reference_sites(_load_reference_sites(reference_path))
     vessels = _serialize_vessels(features)
     risk_cells = _serialize_risk_cells(risk, reference_sites)
-    window_label = _window_label_from_features(features_path)
+    window_label = str(source_bundle.get("window_label") or _window_label_from_features(features_path))
     recommendation_counts = _recommendation_counts(vessels)
     report_text = report_path.read_text(encoding="utf-8")
 

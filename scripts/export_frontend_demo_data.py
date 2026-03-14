@@ -33,6 +33,14 @@ def maybe_round(value: object, digits: int = 3) -> float | None:
     return round(float(value), digits)
 
 
+def window_label_from_features_path(path: Path) -> str:
+    stem = path.stem.replace("vessel_features_", "")
+    parts = stem.split("_")
+    if len(parts) >= 2:
+        return f"{parts[0]} to {parts[1]}"
+    return stem
+
+
 def serialize_vessels(features: pd.DataFrame) -> list[dict]:
     ordered = features.sort_values(["fpi_proxy", "ping_count"], ascending=[False, False]).copy()
     vessels = []
@@ -82,7 +90,7 @@ def serialize_risk_cells(risk: pd.DataFrame) -> list[dict]:
     return cells
 
 
-def build_summary(vessels: list[dict], risk_cells: list[dict]) -> dict:
+def build_summary(vessels: list[dict], risk_cells: list[dict], window_label: str) -> dict:
     top_vessel = vessels[0]
     top_cell = risk_cells[0]
     high_risk_cells = sum(1 for cell in risk_cells if cell["risk_level"] == "high")
@@ -93,7 +101,7 @@ def build_summary(vessels: list[dict], risk_cells: list[dict]) -> dict:
         recommendation_counts[vessel["recommendation"]] = recommendation_counts.get(vessel["recommendation"], 0) + 1
 
     return {
-        "window_label": "2026-01-15 to 2026-01-18",
+        "window_label": window_label,
         "vessels_summarized": len(vessels),
         "grid_cells": len(risk_cells),
         "high_risk_cells": high_risk_cells,
@@ -123,10 +131,11 @@ def main() -> None:
     demo_dir = Path(args.demo_dir)
     public_dir = Path(args.public_dir)
     public_dir.mkdir(parents=True, exist_ok=True)
+    window_label = window_label_from_features_path(Path(args.features))
 
     vessels = serialize_vessels(features)
     risk_cells = serialize_risk_cells(risk)
-    summary = build_summary(vessels, risk_cells)
+    summary = build_summary(vessels, risk_cells, window_label)
 
     (public_dir / "summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2),
