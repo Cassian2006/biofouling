@@ -7,6 +7,7 @@ from backend.services.scoring import (
     current_speed,
     estimate_scores,
     hydrodynamic_attachment_score,
+    maintenance_multiplier,
     productivity_pressure,
     recommend_action,
     salinity_suitability,
@@ -64,8 +65,13 @@ def test_component_scores_are_bounded_and_consistent() -> None:
     assert 0 <= components.productivity_score <= 1
     assert 0 <= components.hydrodynamic_score <= 1
     assert 0 <= components.environment_score <= 1
-    assert 0.7 <= components.environment_multiplier <= 1.0
+    assert 0.85 <= components.environment_multiplier <= 1.15
     assert 0 <= components.maintenance_score <= 1
+    assert 0.9 <= components.maintenance_multiplier <= 1.1
+    assert 0 <= components.stay_probability_score <= 1
+    assert 0 <= components.port_anchorage_score <= 1
+    assert 0 <= components.persistent_exposure_score <= 1
+    assert 1.0 <= components.carbon_penalty_multiplier <= 1.3
     assert 0 <= fpi <= 1
     assert 0 <= ecp <= 1.5
     assert 0 <= rri <= 1
@@ -76,20 +82,32 @@ def test_estimate_scores_returns_expected_scientific_baseline_case() -> None:
     result = estimate_scores(payload)
 
     assert result.vessel_id == "demo-vessel"
-    assert result.fpi_score == 0.4398
-    assert result.ecp_score == 0.5575
-    assert result.rri_score == 0.6747
+    assert result.fpi_score == 0.5276
+    assert result.ecp_score == 0.6162
+    assert result.rri_score == 0.6433
     assert result.components.temperature_score == 0.9375
     assert result.components.salinity_score == 0.9357
     assert result.components.productivity_score == 0.24
     assert result.components.hydrodynamic_score == 1.0
     assert result.components.environment_score == 0.7721
-    assert result.recommendation == "Monitor exposure trend"
+    assert result.components.environment_multiplier == 1.0816
+    assert result.components.maintenance_multiplier == 1.0333
+    assert result.components.carbon_penalty_multiplier == 1.168
+    assert result.recommendation == "Prioritize cleaning assessment"
 
 
 def test_recommend_action_thresholds_cover_three_bands() -> None:
-    assert recommend_action(0.75, 0.4) == "Prioritize cleaning assessment"
-    assert recommend_action(0.3, 0.9) == "Prioritize cleaning assessment"
-    assert recommend_action(0.45, 0.4) == "Monitor exposure trend"
-    assert recommend_action(0.2, 0.6) == "Monitor exposure trend"
-    assert recommend_action(0.1, 0.2) == "Low immediate concern"
+    assert recommend_action(0.75, 0.2) == "Prioritize cleaning assessment"
+    assert recommend_action(0.1, 0.9) == "Prioritize cleaning assessment"
+    assert recommend_action(0.2, 0.13) == "Monitor exposure trend"
+    assert recommend_action(0.07, 0.2) == "Monitor exposure trend"
+    assert recommend_action(0.05, 0.08) == "Low immediate concern"
+
+
+def test_environment_can_enhance_behavior_and_maintenance_remains_in_fpi() -> None:
+    payload = build_payload()
+    fpi, components = compute_fpi(payload)
+
+    assert components.environment_multiplier > 1.0
+    assert maintenance_multiplier(payload) > 1.0
+    assert fpi > behavior_score(payload)

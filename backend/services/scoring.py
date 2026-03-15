@@ -8,6 +8,10 @@ CURRENT_SPEED_P50 = 0.3685
 CURRENT_SPEED_P75 = 0.4189
 CURRENT_SPEED_P90 = 0.4610
 CURRENT_SPEED_MAX = 0.5820
+FPI_PRIORITIZE_THRESHOLD = 0.25
+ECP_PRIORITIZE_THRESHOLD = 0.30
+FPI_MONITOR_THRESHOLD = 0.08
+ECP_MONITOR_THRESHOLD = 0.10
 
 
 def clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
@@ -102,6 +106,10 @@ def maintenance_score(payload: ScoreEstimateRequest) -> float:
     return round(clamp(payload.maintenance_gap_days / 180), 4)
 
 
+def maintenance_multiplier(payload: ScoreEstimateRequest) -> float:
+    return round(0.9 + 0.2 * maintenance_score(payload), 4)
+
+
 def behavior_score(payload: ScoreEstimateRequest) -> float:
     low_speed = normalize_hours(payload.low_speed_hours, 96)
     anchor = normalize_hours(payload.anchor_hours, 120)
@@ -110,6 +118,26 @@ def behavior_score(payload: ScoreEstimateRequest) -> float:
     port_visits = clamp(payload.port_visits / 12)
     port_exposure = max(port_proximity, port_visits * 0.6)
     return round(low_speed * 0.35 + anchor * 0.30 + dwell * 0.20 + port_exposure * 0.15, 4)
+
+
+def stay_probability_score(payload: ScoreEstimateRequest) -> float:
+    low_speed = normalize_hours(payload.low_speed_hours, 96)
+    stationary = normalize_hours(payload.anchor_hours + payload.dwell_hours, 144)
+    return round(low_speed * 0.55 + stationary * 0.45, 4)
+
+
+def port_anchorage_score(payload: ScoreEstimateRequest) -> float:
+    port_proximity = normalize_hours(payload.port_proximity_hours, 96)
+    anchorage = normalize_hours(payload.anchor_hours, 120)
+    anchorage_index = payload.anchorage_exposure_index or 0.0
+    return round(clamp(port_proximity * 0.45 + anchorage * 0.25 + anchorage_index * 0.30), 4)
+
+
+def persistent_exposure_score(payload: ScoreEstimateRequest) -> float:
+    low_speed = normalize_hours(payload.low_speed_hours, 120)
+    stationary = normalize_hours(payload.anchor_hours + payload.dwell_hours, 168)
+    port_proximity = normalize_hours(payload.port_proximity_hours, 120)
+    return round(clamp(low_speed * 0.45 + stationary * 0.35 + port_proximity * 0.20), 4)
 
 
 def environment_components(payload: ScoreEstimateRequest) -> dict[str, float | None]:
@@ -122,7 +150,7 @@ def environment_components(payload: ScoreEstimateRequest) -> dict[str, float | N
         clamp(temperature * 0.40 + salinity * 0.20 + productivity * 0.25 + hydrodynamic * 0.15),
         4,
     )
-    multiplier = round(0.7 + 0.3 * environment, 4)
+    multiplier = round(0.85 + 0.30 * environment, 4)
     return {
         "temperature": temperature,
         "salinity": salinity,
@@ -137,11 +165,18 @@ def environment_components(payload: ScoreEstimateRequest) -> dict[str, float | N
 
 def compute_fpi(payload: ScoreEstimateRequest) -> tuple[float, ComponentScores]:
     behavior = behavior_score(payload)
+    stay_probability = stay_probability_score(payload)
+    port_anchorage = port_anchorage_score(payload)
     environment = environment_components(payload)
     maintenance = maintenance_score(payload)
-    fpi = round(clamp(behavior * environment["multiplier"]), 4)
+    maintenance_adj = maintenance_multiplier(payload)
+    persistent_exposure = persistent_exposure_score(payload)
+    carbon_penalty = round(1.0 + 0.18 * maintenance + 0.12 * persistent_exposure, 4)
+    fpi = round(clamp(behavior * environment["multiplier"] * maintenance_adj), 4)
     return fpi, ComponentScores(
         behavior_score=behavior,
+        stay_probability_score=stay_probability,
+        port_anchorage_score=port_anchorage,
         temperature_score=environment["temperature"],  # type: ignore[arg-type]
         salinity_score=environment["salinity"],  # type: ignore[arg-type]
         physiology_score=environment["physiology"],  # type: ignore[arg-type]
@@ -151,37 +186,31 @@ def compute_fpi(payload: ScoreEstimateRequest) -> tuple[float, ComponentScores]:
         environment_score=environment["environment"],  # type: ignore[arg-type]
         environment_multiplier=environment["multiplier"],  # type: ignore[arg-type]
         maintenance_score=maintenance,
+        maintenance_multiplier=maintenance_adj,
+        persistent_exposure_score=persistent_exposure,
+        carbon_penalty_multiplier=carbon_penalty,
     )
 
 
 def compute_ecp(payload: ScoreEstimateRequest, fpi: float, components: ComponentScores) -> float:
-    low_speed_pressure = normalize_hours(payload.low_speed_hours, 96)
-    penalty_multiplier = (
-        1.0
-        + 0.18 * components.maintenance_score
-        + 0.12 * components.productivity_score
-        + 0.08 * components.temperature_score
-        + 0.07 * low_speed_pressure
-    )
-    return round(clamp(fpi * penalty_multiplier, 0.0, 1.5), 4)
+    return round(clamp(fpi * components.carbon_penalty_multiplier, 0.0, 1.5), 4)
 
 
 def compute_rri(payload: ScoreEstimateRequest, components: ComponentScores) -> float:
     traffic = payload.traffic_density_index or 0.0
-    anchorage = payload.anchorage_exposure_index or 0.0
     rri = (
         components.environment_score * 0.4
         + traffic * 0.25
-        + anchorage * 0.2
-        + components.behavior_score * 0.15
+        + components.stay_probability_score * 0.2
+        + components.port_anchorage_score * 0.15
     )
     return round(clamp(rri), 4)
 
 
 def recommend_action(fpi: float, ecp: float) -> str:
-    if fpi >= 0.7 or ecp >= 0.85:
+    if fpi >= FPI_PRIORITIZE_THRESHOLD or ecp >= ECP_PRIORITIZE_THRESHOLD:
         return "Prioritize cleaning assessment"
-    if fpi >= 0.4 or ecp >= 0.55:
+    if fpi >= FPI_MONITOR_THRESHOLD or ecp >= ECP_MONITOR_THRESHOLD:
         return "Monitor exposure trend"
     return "Low immediate concern"
 

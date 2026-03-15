@@ -37,14 +37,16 @@ def test_scoring_endpoint_returns_scientific_components() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["fpi_score"] == 0.4398
-    assert payload["ecp_score"] == 0.5575
+    assert payload["fpi_score"] == 0.5276
+    assert payload["ecp_score"] == 0.6162
     assert payload["components"]["temperature_score"] == 0.9375
     assert payload["components"]["salinity_score"] == 0.9357
     assert payload["components"]["productivity_score"] == 0.24
     assert payload["components"]["hydrodynamic_score"] == 1.0
     assert payload["components"]["environment_score"] == 0.7721
-    assert payload["components"]["environment_multiplier"] == 0.9316
+    assert payload["components"]["environment_multiplier"] == 1.0816
+    assert payload["components"]["maintenance_multiplier"] == 1.0333
+    assert payload["components"]["carbon_penalty_multiplier"] == 1.168
 
 
 def test_demo_summary_endpoint_returns_real_counts() -> None:

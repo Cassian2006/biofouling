@@ -9,8 +9,8 @@ from scripts.build_science_brief import (
 
 def test_classify_priority_uses_three_clear_bands() -> None:
     assert classify_priority(0.75) == "优先评估"
-    assert classify_priority(0.45) == "持续监测"
-    assert classify_priority(0.2) == "当前较低"
+    assert classify_priority(0.12) == "持续监测"
+    assert classify_priority(0.05) == "当前较低"
 
 
 def test_plain_language_takeaways_include_score_shift_summary() -> None:
@@ -23,9 +23,9 @@ def test_plain_language_takeaways_include_score_shift_summary() -> None:
         }
     )
 
-    assert len(takeaways) == 5
-    assert "FPI 平均值从 0.6151 降到 0.1668" in takeaways[3]
-    assert "ECP 平均值从 0.6209 降到 0.2024" in takeaways[4]
+    assert len(takeaways) == 6
+    assert "FPI 平均值从 0.6151 变为 0.1668" in takeaways[4]
+    assert "ECP 平均值从 0.6209 变为 0.2024" in takeaways[5]
 
 
 def test_render_html_report_includes_figure_notes(tmp_path) -> None:
@@ -60,4 +60,4 @@ def test_render_html_report_includes_figure_notes(tmp_path) -> None:
     assert "这张图是总览图" in html_text
     assert "这张图看的是整体分布" in html_text
     assert "EnvModifier = 0.40T + 0.20S + 0.25P + 0.15H" in html_text
-    assert "FPI = BehaviorExposure × (0.7 + 0.3 × EnvModifier)" in html_text
+    assert "FPI = BehaviorExposure × EnvAdj × MaintenanceAdj" in html_text

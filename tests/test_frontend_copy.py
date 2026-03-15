@@ -21,7 +21,7 @@ def test_tooltip_and_map_components_exist() -> None:
     assert "focusedHotspotKeys" in overview_map
     assert "leaflet" in vessel_map.lower()
     assert "EnvModifier = 0.40T + 0.20S + 0.25P + 0.15H" in method_drawer
-    assert "FPI = BehaviorExposure × (0.7 + 0.3 × EnvModifier)" in method_drawer
+    assert "FPI = BehaviorExposure × EnvAdj × MaintenanceAdj" in method_drawer
     assert "current_speed" in method_drawer
     assert "全连接 Autoencoder" in method_drawer
     assert "单层 LSTM" in method_drawer

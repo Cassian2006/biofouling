@@ -53,9 +53,9 @@ def configure_matplotlib() -> None:
 
 
 def classify_priority(score: float) -> str:
-    if score >= 0.7:
+    if score >= 0.25:
         return "优先评估"
-    if score >= 0.4:
+    if score >= 0.08:
         return "持续监测"
     return "当前较低"
 
@@ -70,15 +70,16 @@ def recommendation_counts(scores: pd.Series) -> dict[str, int]:
 def plain_language_takeaways(summary: dict[str, float]) -> list[str]:
     return [
         "旧算法更像把海温、叶绿素等环境变量当成几个独立加分按钮，只要值偏高，风险就容易被整体抬高。",
-        "新算法先判断水体是否适合附着、这里的生产力压力是否偏高、流动条件是否会冲掉附着窗口，最后再乘上船自己究竟暴露了多久。",
-        "所以新算法不是简单把分数做低，而是把“环境单独抬分”压回去，让行为暴露重新成为主因。",
+        "新算法先判断这片水是否适合附着生物存活、这里的生产力压力是否偏高、水流会不会冲掉附着窗口，最后再看这艘船自己到底暴露了多久。",
+        "这一版和上一版最大的区别是：环境现在既可以增强，也可以削弱风险，不再是“只能降分不能增强”。",
+        "维护状态也重新回到了 FPI 中，但只作为轻修正项，不再完全交给 ECP 去兜底。",
         (
             f"在当前 15 天竞赛样本里，FPI 平均值从 {summary['legacy_fpi_mean']:.4f} "
-            f"降到 {summary['scientific_fpi_mean']:.4f}，说明旧算法确实存在整体偏高的倾向。"
+            f"变为 {summary['scientific_fpi_mean']:.4f}，说明新算法确实把旧版环境单独抬分的部分压回去了。"
         ),
         (
-            f"ECP 平均值从 {summary['legacy_ecp_mean']:.4f} 降到 {summary['scientific_ecp_mean']:.4f}，"
-            "说明新算法对环境因子的使用更加克制，不会因为环境暖就轻易把潜在代价抬得过高。"
+            f"ECP 平均值从 {summary['legacy_ecp_mean']:.4f} 变为 {summary['scientific_ecp_mean']:.4f}，"
+            "说明 ECP 现在更像污损代价放大器，而不是另一套重复算一遍的 FPI。"
         ),
     ]
 
@@ -159,7 +160,7 @@ def build_priority_shift_chart(
         ax=ax,
         palette=["#94a3b8", "#2563eb"],
     )
-    ax.set_title("维护优先级分布变化")
+    ax.set_title("维护优先级变化")
     ax.set_xlabel("")
     ax.set_ylabel("船舶数量")
     plt.tight_layout()
@@ -312,6 +313,18 @@ def render_html_report(
       font-size: 34px;
       line-height: 1.15;
     }}
+    h2 {{
+      margin: 0 0 12px;
+      font-size: 24px;
+    }}
+    h3 {{
+      margin: 0 0 8px;
+      font-size: 18px;
+    }}
+    p, li {{
+      line-height: 1.75;
+      color: #30425e;
+    }}
     .summary-grid {{
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -338,50 +351,7 @@ def render_html_report(
       padding: 22px;
       margin-top: 18px;
     }}
-    .grid {{
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 18px;
-    }}
-    h2 {{
-      margin: 0 0 12px;
-      font-size: 24px;
-    }}
-    p, li {{
-      line-height: 1.75;
-      color: #30425e;
-    }}
-    img {{
-      width: 100%;
-      border-radius: 14px;
-      border: 1px solid #d8e0ee;
-      background: white;
-    }}
-    .figure-note {{
-      margin: 10px 0 0;
-      font-size: 14px;
-      color: #51627d;
-    }}
-    table {{
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
-    }}
-    th, td {{
-      padding: 10px 12px;
-      border-bottom: 1px solid #e3eaf5;
-      text-align: left;
-    }}
-    th {{
-      color: #4c5d7a;
-      background: #f8fbff;
-    }}
-    .two-col {{
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 18px;
-    }}
-    .formula-grid {{
+    .grid, .two-col, .formula-grid {{
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 18px;
@@ -413,6 +383,31 @@ def render_html_report(
       font-size: 13px;
       font-weight: 600;
     }}
+    img {{
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid #d8e0ee;
+      background: white;
+    }}
+    .figure-note {{
+      margin: 10px 0 0;
+      font-size: 14px;
+      color: #51627d;
+    }}
+    table {{
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }}
+    th, td {{
+      padding: 10px 12px;
+      border-bottom: 1px solid #e3eaf5;
+      text-align: left;
+    }}
+    th {{
+      color: #4c5d7a;
+      background: #f8fbff;
+    }}
     @media (max-width: 900px) {{
       .summary-grid, .grid, .two-col, .formula-grid {{
         grid-template-columns: 1fr;
@@ -425,7 +420,7 @@ def render_html_report(
     <section class="hero">
       <p class="kicker">Science Upgrade Brief</p>
       <h1>新旧科学算法机制对比</h1>
-      <p>这份简报用通俗语言说明：旧算法为什么容易把风险整体抬高，新算法为什么更克制、更接近“行为是主因，环境做修正”的逻辑。数据来自冻结的 15 天竞赛样本窗口。</p>
+      <p>这份简报用通俗语言说明：旧算法为什么容易把风险整体抬高，新算法为什么更接近“行为是主因、环境做修正、维护轻度参与”的逻辑。数据来自冻结的 15 天竞赛样本窗口。</p>
       <div class="summary-grid">
         <div class="metric"><span>旧 FPI 平均值</span><strong>{summary['legacy_fpi_mean']:.4f}</strong></div>
         <div class="metric"><span>新 FPI 平均值</span><strong>{summary['scientific_fpi_mean']:.4f}</strong></div>
@@ -441,43 +436,47 @@ def render_html_report(
 
     <section class="panel">
       <h2>新算法具体怎么计算</h2>
-      <p>新算法不再把海温、盐度、叶绿素和海流当成四个独立加分按钮，而是先拆成四个机制层，再合成一个环境修正值，最后和船自己的行为暴露相乘。</p>
+      <p>新算法不再把海温、盐度、叶绿素和海流当成四个独立加分按钮，而是先拆成几个机制层，再合成环境修正值，最后与行为暴露和维护状态共同形成 FPI。</p>
       <div>
         <span class="tag">海温适宜度 T</span>
         <span class="tag">盐度适宜度 S</span>
         <span class="tag">叶绿素压力 P</span>
         <span class="tag">水动力附着 H</span>
         <span class="tag">行为暴露 BehaviorExposure</span>
+        <span class="tag">维护修正 MaintenanceAdj</span>
       </div>
       <div class="formula-grid">
         <div class="formula-card">
           <h3>第一步：环境先拆机制</h3>
-          <p>环境部分先回答四个问题：这里的水温和盐度适不适合附着生物稳定存活？这里的叶绿素压力高不高？这里的流动条件会不会把附着窗口冲掉？</p>
+          <p>环境部分先回答四个问题：这里的海温和盐度适不适合附着生物稳定存活？这里的叶绿素压力高不高？这里的流动条件会不会把附着窗口冲掉？</p>
           <div class="formula">T = sst_suitability
 S = salinity_suitability
 P = productivity_pressure_from_chl
 H = hydrodynamic_attachment_score_from_current_speed</div>
-          <p class="figure-note">这里最关键的变化是：海流不再分别看 u 和 v 方向，而是先合成为 current_speed，再判断“附着会不会被冲掉”。</p>
+          <p class="figure-note">关键变化是：海流不再分别看 u 和 v，而是先合成为 current_speed，再判断附着会不会被冲掉。</p>
         </div>
         <div class="formula-card">
           <h3>第二步：先合成环境修正值</h3>
           <p>温度仍然最重要，盐度像一个闸门，叶绿素是生产力压力代理，海流是附着约束项。</p>
-          <div class="formula">EnvModifier = 0.40T + 0.20S + 0.25P + 0.15H</div>
-          <p class="figure-note">这一步的意思不是“环境直接决定风险”，而是先把环境整理成一个更合理的修正因子。</p>
+          <div class="formula">EnvModifier = 0.40T + 0.20S + 0.25P + 0.15H
+EnvAdj = 0.85 + 0.30 × EnvModifier</div>
+          <p class="figure-note">这一版的重点是：环境乘子以 1 为中心，所以环境现在既可以增强，也可以削弱风险。</p>
         </div>
         <div class="formula-card">
           <h3>第三步：FPI 由行为主导</h3>
-          <p>最终的 FPI 不再是环境直接加分，而是先看这艘船自己慢了多久、停了多久、靠港多久，再让环境去增强或削弱它。</p>
-          <div class="formula">FPI = BehaviorExposure × (0.7 + 0.3 × EnvModifier)</div>
-          <p class="figure-note">这就是新算法最核心的思想：行为暴露是主因，环境只做修正，避免出现“船本身没怎么停，但因为环境暖就被打成高风险”的假阳性。</p>
+          <p>最终的 FPI 先看这艘船自己慢了多久、停了多久、靠港多久，再由环境和维护做轻修正。</p>
+          <div class="formula">MaintenanceAdj = 0.90 + 0.20 × MaintenanceScore
+FPI = BehaviorExposure × EnvAdj × MaintenanceAdj</div>
+          <p class="figure-note">这一步解决了两个问题：环境不再只能降分，维护也不再完全被移出 FPI。</p>
         </div>
         <div class="formula-card">
           <h3>第四步：ECP 和 RRI</h3>
-          <p>ECP 继续表示潜在代价，但不再简单照搬旧版单调加分；RRI 则继续服务于区域热点识别。</p>
-          <div class="formula">ECP ≈ FPI × (1 + maintenance + productivity + temperature + low_speed pressure)
+          <p>ECP 现在更像“污损代价放大器”，RRI 则继续服务于区域热点识别。</p>
+          <div class="formula">CarbonPenaltyModifier = 1 + 0.18 × MaintenanceBurden + 0.12 × PersistentExposure
+ECP = FPI × CarbonPenaltyModifier
 
-RRI = 0.40 × EnvModifier + 0.25 × Traffic + 0.20 × Anchorage + 0.15 × Behavior</div>
-          <p class="figure-note">所以 ECP 和 RRI 也都变得更克制：ECP 以 FPI 为底，RRI 仍看空间风险，但环境项已经切换成新机制层。</p>
+RRI = 0.40 × EnvModifier + 0.25 × Traffic + 0.20 × StayProb + 0.15 × PortAnchorageIntensity</div>
+          <p class="figure-note">所以 ECP 不再是第二版 FPI，RRI 也把“停留概率”和“港口/锚地强度”拆开了，减少重复计分。</p>
         </div>
       </div>
     </section>
@@ -489,7 +488,7 @@ RRI = 0.40 × EnvModifier + 0.25 × Traffic + 0.20 × Anchorage + 0.15 × Behavi
       </div>
       <div class="panel">
         <h2>新算法怎么想</h2>
-        <p>新算法先问四件事：这片水是否适合附着生物存活，这里的生产力压力是否偏高，这里的水流是否会冲掉附着窗口，这艘船自己到底慢了多久、停了多久、靠港多久。只有当行为暴露也高时，环境才会真正把风险放大。</p>
+        <p>新算法先问四件事：这片水是否适合附着生物存活，这里的生产力压力是否偏高，这里的水流是否会冲掉附着窗口，这艘船自己到底慢了多久、停了多久、靠港多久。只有当行为暴露足够高时，环境才会真正把风险放大。</p>
       </div>
     </section>
 
@@ -510,7 +509,7 @@ RRI = 0.40 × EnvModifier + 0.25 × Traffic + 0.20 × Anchorage + 0.15 × Behavi
         <p>旧算法分级：优先评估 {priority_counts['legacy']['优先评估']}，持续监测 {priority_counts['legacy']['持续监测']}，当前较低 {priority_counts['legacy']['当前较低']}。</p>
         <p>新算法分级：优先评估 {priority_counts['scientific']['优先评估']}，持续监测 {priority_counts['scientific']['持续监测']}，当前较低 {priority_counts['scientific']['当前较低']}。</p>
         <img src="priority_shift.png" alt="维护优先级变化">
-        <p class="figure-note">这张图看的是结论层面的变化。旧算法会把更多船推到高优先级；新算法会把“只是环境不错、但行为暴露不够高”的对象降回更克制的等级。</p>
+        <p class="figure-note">这张图看的是结论层面的变化。新算法仍然保留了一批需要优先评估的船，但不再像旧算法那样几乎把所有对象都推到高等级。</p>
       </div>
     </section>
 

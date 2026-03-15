@@ -38,6 +38,8 @@ class ScoreEstimateRequest(BaseModel):
 
 class ComponentScores(BaseModel):
     behavior_score: float
+    stay_probability_score: float
+    port_anchorage_score: float
     temperature_score: float
     salinity_score: float
     physiology_score: float
@@ -47,6 +49,9 @@ class ComponentScores(BaseModel):
     environment_score: float
     environment_multiplier: float
     maintenance_score: float
+    maintenance_multiplier: float
+    persistent_exposure_score: float
+    carbon_penalty_multiplier: float
 
 
 class ScoreEstimateResponse(BaseModel):

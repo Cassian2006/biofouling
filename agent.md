@@ -2225,3 +2225,35 @@ README 同步：
 - `science_upgrade_brief.html` 已包含新算法计算区块。
 - 本轮已完成回归验证：
   - `pytest = 40 passed`
+### 2026-03-15 13:02:00 +08:00
+操作：
+- 对科学评分做第二轮结构修正，重点处理环境只能减分、维护被移出 FPI、ECP 重复计分、RRI 语义重叠这四个问题。
+- 单独重跑 15 天 `science-v2` 特征结果与旧新评分对比，不覆盖冻结的竞赛主版本文件。
+- 重写科学评分文档、前端核心算法说明和桌面简报脚本，使代码、文档、前端和桌面材料统一到同一口径。
+
+过程与思路：
+- 用户指出第一版科学升级虽然方向正确，但 `FPI = BehaviorExposure × (0.7 + 0.3 × EnvModifier)` 存在结构缺陷：如果 `EnvModifier` 只能落在 0 到 1 之间，环境乘子就永远不可能超过 1，这等于环境只能削弱、不能增强。这个判断是对的，而且和之前“大量高分船恢复安全”的现象一致。
+- 因此本轮不是做小修，而是重新收口三个主分数的职责边界。FPI 改成“行为主导 × 环境可增可减 × 维护轻修正”；ECP 改成真正的代价放大器，不再把温度、叶绿素、低速再完整展开重算一遍；RRI 则把区域层拆成环境、交通、停留概率和港口/锚地强度四层，减少 anchorage 与 behavior 的重叠。
+- 公式修正后，分数尺度虽然更合理，但旧阈值立刻失效，导致一开始重新跑出的 15 天结果里 `Low immediate concern` 膨胀到五百多艘。这说明公式修正只是第一步，阈值重标也是必须做的第二步。本轮后续据此重新收敛建议阈值，把分布拉回到更健康的区间。
+- 阈值重标后的 `science-v2` 结果是：`189` 艘优先评估、`207` 艘持续监测、`241` 艘当前较低。它已经明显比“547 艘直接变安全”的中间状态合理，也比冻结基线的旧版分布更克制。
+- 在代码层完成后，又同步重写了 `docs/scoring_rationale.md`、`docs/scientific_review.md` 和前端 `MethodDrawer.vue`，确保后面无论看文档、看前端“核心算法”、还是看桌面简报，看到的都是同一套公式和解释。
+- 桌面总入口 `science_upgrade_brief.html` 也已重新生成，当前其中包含：
+  - 新旧机制通俗对比
+  - 每张图的一句话解释
+  - 新算法具体计算过程
+  - 第二轮修正后的新公式
+
+本轮结果：
+- 新 FPI 结构：
+  - `FPI = BehaviorExposure × EnvAdj × MaintenanceAdj`
+- 新 ECP 结构：
+  - `ECP = FPI × CarbonPenaltyModifier`
+- 新 RRI 结构：
+  - `RRI = 0.40 × EnvModifier + 0.25 × Traffic + 0.20 × StayProb + 0.15 × PortAnchorageIntensity`
+- 15 天 `science-v2` 建议分布：
+  - `Prioritize cleaning assessment = 189`
+  - `Monitor exposure trend = 207`
+  - `Low immediate concern = 241`
+- 本轮已完成回归验证：
+  - `pytest = 41 passed`
+  - `frontend npm run build = pass`

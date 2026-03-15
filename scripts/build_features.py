@@ -263,6 +263,8 @@ def apply_scientific_scores(features: pd.DataFrame) -> pd.DataFrame:
         results.append(
             {
                 "behavior_score": result.components.behavior_score,
+                "stay_probability_score": result.components.stay_probability_score,
+                "port_anchorage_score": result.components.port_anchorage_score,
                 "temperature_score": result.components.temperature_score,
                 "salinity_score": result.components.salinity_score,
                 "physiology_score": result.components.physiology_score,
@@ -271,6 +273,9 @@ def apply_scientific_scores(features: pd.DataFrame) -> pd.DataFrame:
                 "environment_score": result.components.environment_score,
                 "environment_multiplier": result.components.environment_multiplier,
                 "maintenance_score": result.components.maintenance_score,
+                "maintenance_multiplier": result.components.maintenance_multiplier,
+                "persistent_exposure_score": result.components.persistent_exposure_score,
+                "carbon_penalty_multiplier": result.components.carbon_penalty_multiplier,
                 "current_speed": result.components.current_speed,
                 "fpi_proxy": result.fpi_score,
                 "ecp_proxy": result.ecp_score,

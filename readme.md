@@ -1975,3 +1975,41 @@ project/
 补充更新：
 - `science_upgrade_brief.html` 现已为每张图增加一句对应解释，打开总入口即可直接理解各图在说明什么，不再需要单独对照文档。
 - `science_upgrade_brief.html` 现已加入“新算法具体怎么计算”区块，包含机制层解释、`EnvModifier`、`FPI`、`ECP`、`RRI` 的公式与通俗说明。
+
+64. 科学公式第二轮修正已完成（2026-03-15）
+本轮针对第一版科学升级中的几个结构性问题做了修正，重点是：
+
+- 环境项不再“只能降分不能增强”
+- 维护状态重新回到 FPI 中，作为轻修正项
+- ECP 改成真正的代价放大器，不再像“第二版 FPI”
+- RRI 改成更清楚的区域语义结构，避免 anchorage 与 behavior 重复计分
+
+当前正式结构：
+- `EnvModifier = 0.40T + 0.20S + 0.25P + 0.15H`
+- `EnvAdj = 0.85 + 0.30 × EnvModifier`
+- `MaintenanceAdj = 0.90 + 0.20 × MaintenanceScore`
+- `FPI = BehaviorExposure × EnvAdj × MaintenanceAdj`
+- `ECP = FPI × CarbonPenaltyModifier`
+- `RRI = 0.40 × EnvModifier + 0.25 × Traffic + 0.20 × StayProb + 0.15 × PortAnchorageIntensity`
+
+阈值也已按新尺度重标：
+- `Prioritize cleaning assessment`
+  - `FPI >= 0.25` 或 `ECP >= 0.30`
+- `Monitor exposure trend`
+  - `FPI >= 0.08` 或 `ECP >= 0.10`
+
+本轮 15 天 `science-v2` 结果摘要：
+- `Prioritize cleaning assessment = 189`
+- `Monitor exposure trend = 207`
+- `Low immediate concern = 241`
+
+本轮同步更新：
+- `docs/scoring_rationale.md`
+- `docs/scientific_review.md`
+- `frontend/src/components/MethodDrawer.vue`
+- `scripts/build_science_brief.py`
+- `C:\Users\cai yuan qi\Desktop\biofouling_science_upgrade\science_upgrade_brief.html`
+
+当前验证状态：
+- `pytest = 41 passed`
+- `frontend npm run build = pass`
