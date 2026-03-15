@@ -2257,3 +2257,21 @@ README 同步：
 - 本轮已完成回归验证：
   - `pytest = 41 passed`
   - `frontend npm run build = pass`
+### 2026-03-15 12:46:30 +08:00
+操作：
+- 重新导出科学升级相关的可视化对比图。
+- 同步刷新 `outputs/science/` 与桌面简报目录中的图表和 HTML 总入口。
+
+过程与思路：
+- 用户这一步不是要继续改公式，而是要把现有科学升级版本对应的可视化材料更新到最新状态。因此本轮不再动评分逻辑，只重新执行对比脚本和桌面简报脚本。
+- 这样做的目的，是确保你现在打开的 `scoring_v1_vs_v2.png`、分布变化图、优先级变化图、逐船对比图和总入口 HTML，全都严格对应当前已经修正后的第二轮科学结构，而不是停留在上一次导出的旧图版本。
+- 本轮重点核查了两个位置：仓库内 `outputs/science/` 的基础对比产物，以及桌面目录 `C:\Users\cai yuan qi\Desktop\biofouling_science_upgrade` 的答辩版材料。两边都已刷新到最新时间戳。
+
+本轮结果：
+- 已刷新：
+  - `outputs/science/scoring_comparison_20260115_20260130.csv`
+  - `outputs/science/scoring_comparison_summary.json`
+  - `outputs/science/scoring_v1_vs_v2.png`
+- 已刷新桌面目录：
+  - `C:\Users\cai yuan qi\Desktop\biofouling_science_upgrade`
+  - 包括 `science_upgrade_brief.html` 及全部补充图表

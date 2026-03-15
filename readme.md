@@ -2013,3 +2013,6 @@ project/
 当前验证状态：
 - `pytest = 41 passed`
 - `frontend npm run build = pass`
+
+补充更新：
+- `outputs/science/` 与桌面目录 `C:\Users\cai yuan qi\Desktop\biofouling_science_upgrade` 的可视化对比图已基于当前最新科学公式重新导出，可直接用于讲解与展示。
