@@ -59,3 +59,5 @@ def test_render_html_report_includes_figure_notes(tmp_path) -> None:
     html_text = (tmp_path / "science_upgrade_brief.html").read_text(encoding="utf-8")
     assert "这张图是总览图" in html_text
     assert "这张图看的是整体分布" in html_text
+    assert "EnvModifier = 0.40T + 0.20S + 0.25P + 0.15H" in html_text
+    assert "FPI = BehaviorExposure × (0.7 + 0.3 × EnvModifier)" in html_text

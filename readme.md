@@ -1974,3 +1974,4 @@ project/
 
 补充更新：
 - `science_upgrade_brief.html` 现已为每张图增加一句对应解释，打开总入口即可直接理解各图在说明什么，不再需要单独对照文档。
+- `science_upgrade_brief.html` 现已加入“新算法具体怎么计算”区块，包含机制层解释、`EnvModifier`、`FPI`、`ECP`、`RRI` 的公式与通俗说明。

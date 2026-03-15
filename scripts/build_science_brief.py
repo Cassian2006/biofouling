@@ -381,8 +381,40 @@ def render_html_report(
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 18px;
     }}
+    .formula-grid {{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }}
+    .formula-card {{
+      border: 1px solid #d8e0ee;
+      border-radius: 14px;
+      padding: 16px;
+      background: #f8fbff;
+    }}
+    .formula {{
+      margin: 10px 0;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: #eef4ff;
+      color: #1d4ed8;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }}
+    .tag {{
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #e2ecff;
+      color: #1d4ed8;
+      font-size: 13px;
+      font-weight: 600;
+    }}
     @media (max-width: 900px) {{
-      .summary-grid, .grid, .two-col {{
+      .summary-grid, .grid, .two-col, .formula-grid {{
         grid-template-columns: 1fr;
       }}
     }}
@@ -405,6 +437,49 @@ def render_html_report(
     <section class="panel">
       <h2>一句话先讲明白</h2>
       <ul>{takeaway_html}</ul>
+    </section>
+
+    <section class="panel">
+      <h2>新算法具体怎么计算</h2>
+      <p>新算法不再把海温、盐度、叶绿素和海流当成四个独立加分按钮，而是先拆成四个机制层，再合成一个环境修正值，最后和船自己的行为暴露相乘。</p>
+      <div>
+        <span class="tag">海温适宜度 T</span>
+        <span class="tag">盐度适宜度 S</span>
+        <span class="tag">叶绿素压力 P</span>
+        <span class="tag">水动力附着 H</span>
+        <span class="tag">行为暴露 BehaviorExposure</span>
+      </div>
+      <div class="formula-grid">
+        <div class="formula-card">
+          <h3>第一步：环境先拆机制</h3>
+          <p>环境部分先回答四个问题：这里的水温和盐度适不适合附着生物稳定存活？这里的叶绿素压力高不高？这里的流动条件会不会把附着窗口冲掉？</p>
+          <div class="formula">T = sst_suitability
+S = salinity_suitability
+P = productivity_pressure_from_chl
+H = hydrodynamic_attachment_score_from_current_speed</div>
+          <p class="figure-note">这里最关键的变化是：海流不再分别看 u 和 v 方向，而是先合成为 current_speed，再判断“附着会不会被冲掉”。</p>
+        </div>
+        <div class="formula-card">
+          <h3>第二步：先合成环境修正值</h3>
+          <p>温度仍然最重要，盐度像一个闸门，叶绿素是生产力压力代理，海流是附着约束项。</p>
+          <div class="formula">EnvModifier = 0.40T + 0.20S + 0.25P + 0.15H</div>
+          <p class="figure-note">这一步的意思不是“环境直接决定风险”，而是先把环境整理成一个更合理的修正因子。</p>
+        </div>
+        <div class="formula-card">
+          <h3>第三步：FPI 由行为主导</h3>
+          <p>最终的 FPI 不再是环境直接加分，而是先看这艘船自己慢了多久、停了多久、靠港多久，再让环境去增强或削弱它。</p>
+          <div class="formula">FPI = BehaviorExposure × (0.7 + 0.3 × EnvModifier)</div>
+          <p class="figure-note">这就是新算法最核心的思想：行为暴露是主因，环境只做修正，避免出现“船本身没怎么停，但因为环境暖就被打成高风险”的假阳性。</p>
+        </div>
+        <div class="formula-card">
+          <h3>第四步：ECP 和 RRI</h3>
+          <p>ECP 继续表示潜在代价，但不再简单照搬旧版单调加分；RRI 则继续服务于区域热点识别。</p>
+          <div class="formula">ECP ≈ FPI × (1 + maintenance + productivity + temperature + low_speed pressure)
+
+RRI = 0.40 × EnvModifier + 0.25 × Traffic + 0.20 × Anchorage + 0.15 × Behavior</div>
+          <p class="figure-note">所以 ECP 和 RRI 也都变得更克制：ECP 以 FPI 为底，RRI 仍看空间风险，但环境项已经切换成新机制层。</p>
+        </div>
+      </div>
     </section>
 
     <section class="grid">
