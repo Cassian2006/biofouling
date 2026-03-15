@@ -2016,3 +2016,27 @@ project/
 
 补充更新：
 - `outputs/science/` 与桌面目录 `C:\Users\cai yuan qi\Desktop\biofouling_science_upgrade` 的可视化对比图已基于当前最新科学公式重新导出，可直接用于讲解与展示。
+65. 科学性说明已收口为正式材料（2026-03-15）
+本轮将分散在评分说明、科学 review、参数来源和前端算法说明中的“科学边界”收成了一套可直接用于答辩与评审沟通的正式材料，重点回答以下问题：
+
+- FPI 为什么采用“行为主导、环境修正、维护轻修正”
+- ECP 为什么只能被解释为相对惩罚，而不是正式碳核算
+- RRI 为什么是区域综合风险图层，而不是“真实污损地图”
+- LSTM 与异常检测分别回答什么问题，哪些对象能预测，哪些对象只是异常筛查
+- 当前哪些部分已有真实机制支撑，哪些部分仍是启发式近似，以及这一块目前做到哪一步
+
+本轮新增与重写文档：
+- `docs/scientific_statement.md`
+- `docs/scientific_review.md`
+- `docs/scoring_rationale.md`
+- `docs/parameter_sources.md`
+
+本轮同步补充：
+- 文档测试：`tests/test_science_docs.py`
+
+当前口径：
+- 平台已完成“科学结构收口”和“边界说明收口”
+- 平台尚未完成“逐项文献级标定”和“外部实测级校准”
+
+当前验证状态：
+- `pytest = 44 passed`

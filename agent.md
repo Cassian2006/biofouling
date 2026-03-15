@@ -2275,3 +2275,28 @@ README 同步：
 - 已刷新桌面目录：
   - `C:\Users\cai yuan qi\Desktop\biofouling_science_upgrade`
   - 包括 `science_upgrade_brief.html` 及全部补充图表
+### 2026-03-15 13:12:09 +08:00
+操作：
+- 将“科学性说明”收口为正式答辩材料，重点回答 FPI、ECP、RRI、LSTM 与异常检测的科学边界。
+- 重写科学文档并恢复参数来源表，避免此前内容继续分散在多个文档中。
+- 新增文档测试，锁住关键边界表述，防止后续再次改散。
+
+过程与思路：
+- 用户这次不是要继续调整公式，而是要把“我们到底能说到哪一步、不能说到哪一步”整理成正式材料。这个问题如果只补几句话到 README 里，后面答辩时还是不够用，因此我选择把它收成单独文档。
+- 文档结构按评委最容易追问的路径来写：先解释 FPI 为什么是行为主导、环境修正、维护轻修正；再说明 ECP 为什么只能算相对惩罚；然后解释 RRI 为什么是区域综合风险图层；最后区分 LSTM 与异常检测各自回答的问题。
+- 这轮重点不是再发明新参数，而是把“机制支撑”和“工程启发式近似”分开写清。这样后续答辩时既可以说明科学依据，也能诚实说明当前仍未完成逐项文献级标定和外部实测校准。
+- 另外，上一轮中 `docs/parameter_sources.md` 因为中断处于删除状态，本轮已经恢复并按新的科学口径重写，避免仓库留着半成品。
+
+本轮结果：
+- 新增正式材料：
+  - `docs/scientific_statement.md`
+- 重写：
+  - `docs/scientific_review.md`
+  - `docs/scoring_rationale.md`
+  - `docs/parameter_sources.md`
+- 新增测试：
+  - `tests/test_science_docs.py`
+- 同步更新：
+  - `readme.md`
+- 本轮已完成回归验证：
+  - `pytest = 44 passed`
