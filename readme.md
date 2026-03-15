@@ -1946,3 +1946,28 @@ project/
 - 新评分显著压低了旧版单调加分逻辑下的整体风险水平
 - 原因不是风险被“削弱”了，而是环境项不再单独主导，行为暴露重新成为主因
 - 这一变化更符合 IMO 风险逻辑，也更适合作为答辩时的科学表达口径
+63. 科学升级桌面简报已生成（2026-03-15）
+本轮新增了一套面向汇报与答辩的“通俗版科学升级简报”，用于解释旧算法与新算法的机制差异，并将相关图表统一输出到电脑桌面，便于直接展示。
+
+桌面输出目录：
+- `C:\Users\cai yuan qi\Desktop\biofouling_science_upgrade`
+
+本轮新增内容：
+- 通俗版 HTML 简报：
+  - `science_upgrade_brief.html`
+- 已有对比图复制输出：
+  - `scoring_v1_vs_v2.png`
+- 新增补充图表：
+  - `fpi_ecp_distribution_shift.png`
+  - `priority_shift.png`
+  - `top_fpi_drop.png`
+  - `mechanism_component_means.png`
+  - `fpi_scatter_shift.png`
+
+简报内容重点：
+- 用通俗语言说明旧算法为什么容易把环境项整体抬分。
+- 用通俗语言说明新算法为什么改成“行为主因 + 环境修正”。
+- 用图表展示旧新评分分布、维护优先级变化、逐船对比和典型案例降幅。
+
+当前验证状态：
+- `pytest = 39 passed`
