@@ -357,6 +357,11 @@ def render_html_report(
       border: 1px solid #d8e0ee;
       background: white;
     }}
+    .figure-note {{
+      margin: 10px 0 0;
+      font-size: 14px;
+      color: #51627d;
+    }}
     table {{
       width: 100%;
       border-collapse: collapse;
@@ -416,18 +421,21 @@ def render_html_report(
     <section class="panel">
       <h2>已有旧新评分总对比</h2>
       <img src="scoring_v1_vs_v2.png" alt="旧新评分总对比">
+      <p class="figure-note">这张图是总览图。可以先看出一个大方向：新算法下，大部分船的评分都明显低于旧算法，说明旧算法确实更容易把整体风险抬高。</p>
     </section>
 
     <section class="two-col">
       <div class="panel">
         <h2>分布变化</h2>
         <img src="fpi_ecp_distribution_shift.png" alt="FPI 与 ECP 分布变化">
+        <p class="figure-note">这张图看的是整体分布。旧算法的分数整体更靠右，也就是更容易给出偏高分；新算法把分布往中低区间拉回来了。</p>
       </div>
       <div class="panel">
         <h2>维护优先级变化</h2>
         <p>旧算法分级：优先评估 {priority_counts['legacy']['优先评估']}，持续监测 {priority_counts['legacy']['持续监测']}，当前较低 {priority_counts['legacy']['当前较低']}。</p>
         <p>新算法分级：优先评估 {priority_counts['scientific']['优先评估']}，持续监测 {priority_counts['scientific']['持续监测']}，当前较低 {priority_counts['scientific']['当前较低']}。</p>
         <img src="priority_shift.png" alt="维护优先级变化">
+        <p class="figure-note">这张图看的是结论层面的变化。旧算法会把更多船推到高优先级；新算法会把“只是环境不错、但行为暴露不够高”的对象降回更克制的等级。</p>
       </div>
     </section>
 
@@ -435,10 +443,12 @@ def render_html_report(
       <div class="panel">
         <h2>新算法内部看什么</h2>
         <img src="mechanism_component_means.png" alt="新算法机制分量均值">
+        <p class="figure-note">这张图是在拆新算法内部。它告诉你新算法不是只看一个总分，而是同时看行为暴露、海温适宜、盐度适宜、叶绿素压力和水动力附着几个机制分量。</p>
       </div>
       <div class="panel">
         <h2>逐船对比</h2>
         <img src="fpi_scatter_shift.png" alt="逐船 FPI 旧新对比">
+        <p class="figure-note">这张图看单船层面的变化。虚线表示“新旧分数一样高”，大多数点落在虚线下方，说明同一艘船在新算法里的 FPI 往往低于旧算法。</p>
       </div>
     </section>
 
@@ -446,6 +456,7 @@ def render_html_report(
       <h2>降幅最大的船舶</h2>
       <img src="top_fpi_drop.png" alt="FPI 降幅最大的船舶">
       <p>这些船在新算法里被压分最明显。通常不是因为它们完全没风险，而是旧算法把环境因素抬得过高；新算法要求“环境适宜 + 行为暴露也高”同时成立。</p>
+      <p class="figure-note">这张图适合讲案例。它列出从旧算法切到新算法后降幅最大的对象，方便你解释“哪些船以前被环境项抬分抬得太厉害”。</p>
     </section>
 
     <section class="panel">
