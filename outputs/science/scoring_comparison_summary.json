@@ -1,0 +1,8 @@
+{
+  "legacy_fpi_mean": 0.6151,
+  "scientific_fpi_mean": 0.1668,
+  "legacy_ecp_mean": 0.6209,
+  "scientific_ecp_mean": 0.2024,
+  "mean_fpi_delta": -0.4483,
+  "mean_ecp_delta": -0.4185
+}

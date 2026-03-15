@@ -20,13 +20,11 @@ def test_tooltip_and_map_components_exist() -> None:
     assert "map-overlay-badge" in overview_map
     assert "focusedHotspotKeys" in overview_map
     assert "leaflet" in vessel_map.lower()
-    assert "FPI = 0.5" in method_drawer
-    assert "RRI = 0.40" in method_drawer
-    assert "交通疏密" in method_drawer
-    assert "低速停留" in method_drawer
-    assert "水域情况" in method_drawer
-    assert "训练样本使用最近 8 个连续窗口作为输入" in method_drawer
-    assert "当前前端使用的校准阈值为 0.53 / 0.69" in method_drawer
+    assert "EnvModifier = 0.40T + 0.20S + 0.25P + 0.15H" in method_drawer
+    assert "FPI = BehaviorExposure × (0.7 + 0.3 × EnvModifier)" in method_drawer
+    assert "current_speed" in method_drawer
+    assert "全连接 Autoencoder" in method_drawer
+    assert "单层 LSTM" in method_drawer
 
 
 def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:

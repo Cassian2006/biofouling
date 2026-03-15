@@ -1,4 +1,13 @@
+import math
+
 from backend.schemas.scoring import ComponentScores, ScoreEstimateRequest, ScoreEstimateResponse
+
+
+CURRENT_SPEED_P25 = 0.3303
+CURRENT_SPEED_P50 = 0.3685
+CURRENT_SPEED_P75 = 0.4189
+CURRENT_SPEED_P90 = 0.4610
+CURRENT_SPEED_MAX = 0.5820
 
 
 def clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
@@ -9,47 +18,152 @@ def normalize_hours(hours: float, full_scale: float) -> float:
     return clamp(hours / full_scale)
 
 
-def behavior_score(payload: ScoreEstimateRequest) -> float:
-    dwell = normalize_hours(payload.dwell_hours, 72)
-    anchor = normalize_hours(payload.anchor_hours, 120)
-    low_speed = normalize_hours(payload.low_speed_hours, 96)
-    port_visits = clamp(payload.port_visits / 12)
-    return round(dwell * 0.35 + anchor * 0.30 + low_speed * 0.20 + port_visits * 0.15, 4)
+def piecewise_linear(value: float, breakpoints: list[tuple[float, float]]) -> float:
+    if not breakpoints:
+        raise ValueError("Breakpoints must not be empty")
+    if value <= breakpoints[0][0]:
+        return breakpoints[0][1]
+    for index in range(1, len(breakpoints)):
+        x0, y0 = breakpoints[index - 1]
+        x1, y1 = breakpoints[index]
+        if value <= x1:
+            if x1 == x0:
+                return y1
+            ratio = (value - x0) / (x1 - x0)
+            return y0 + ratio * (y1 - y0)
+    return breakpoints[-1][1]
 
 
-def environment_score(payload: ScoreEstimateRequest) -> float:
-    sst = 0.0 if payload.mean_sst is None else clamp((payload.mean_sst - 24) / 8)
-    chlorophyll = (
-        0.0 if payload.mean_chlorophyll_a is None else clamp(payload.mean_chlorophyll_a / 1.5)
-    )
-    return round(sst * 0.55 + chlorophyll * 0.45, 4)
+def sst_suitability(mean_sst: float | None) -> float:
+    if mean_sst is None:
+        return 0.0
+    breakpoints = [
+        (0.0, 0.05),
+        (18.0, 0.10),
+        (25.0, 0.85),
+        (31.0, 1.00),
+        (33.0, 0.85),
+        (36.0, 0.55),
+        (40.0, 0.25),
+    ]
+    return round(clamp(piecewise_linear(mean_sst, breakpoints)), 4)
+
+
+def salinity_suitability(mean_salinity: float | None) -> float:
+    if mean_salinity is None:
+        return 0.0
+    breakpoints = [
+        (0.0, 0.05),
+        (20.0, 0.05),
+        (28.0, 0.85),
+        (35.0, 1.00),
+        (38.0, 0.80),
+        (42.0, 0.40),
+    ]
+    return round(clamp(piecewise_linear(mean_salinity, breakpoints)), 4)
+
+
+def productivity_pressure(mean_chlorophyll_a: float | None) -> float:
+    if mean_chlorophyll_a is None:
+        return 0.0
+    breakpoints = [
+        (0.0, 0.05),
+        (0.5, 0.15),
+        (2.0, 0.60),
+        (8.0, 1.00),
+        (12.0, 1.00),
+    ]
+    return round(clamp(piecewise_linear(mean_chlorophyll_a, breakpoints)), 4)
+
+
+def current_speed(mean_current_u: float | None, mean_current_v: float | None) -> float | None:
+    if mean_current_u is None or mean_current_v is None:
+        return None
+    return round(math.sqrt(mean_current_u**2 + mean_current_v**2), 4)
+
+
+def hydrodynamic_attachment_score(mean_current_u: float | None, mean_current_v: float | None) -> tuple[float, float | None]:
+    speed = current_speed(mean_current_u, mean_current_v)
+    if speed is None:
+        return 0.0, None
+    breakpoints = [
+        (0.0, 1.00),
+        (CURRENT_SPEED_P25, 1.00),
+        (CURRENT_SPEED_P50, 0.75),
+        (CURRENT_SPEED_P75, 0.40),
+        (CURRENT_SPEED_P90, 0.18),
+        (CURRENT_SPEED_MAX, 0.05),
+    ]
+    score = clamp(piecewise_linear(speed, breakpoints))
+    return round(score, 4), speed
 
 
 def maintenance_score(payload: ScoreEstimateRequest) -> float:
     return round(clamp(payload.maintenance_gap_days / 180), 4)
 
 
+def behavior_score(payload: ScoreEstimateRequest) -> float:
+    low_speed = normalize_hours(payload.low_speed_hours, 96)
+    anchor = normalize_hours(payload.anchor_hours, 120)
+    dwell = normalize_hours(payload.dwell_hours, 72)
+    port_proximity = normalize_hours(payload.port_proximity_hours, 72)
+    port_visits = clamp(payload.port_visits / 12)
+    port_exposure = max(port_proximity, port_visits * 0.6)
+    return round(low_speed * 0.35 + anchor * 0.30 + dwell * 0.20 + port_exposure * 0.15, 4)
+
+
+def environment_components(payload: ScoreEstimateRequest) -> dict[str, float | None]:
+    temperature = sst_suitability(payload.mean_sst)
+    salinity = salinity_suitability(payload.mean_salinity)
+    physiology = round(clamp(temperature * 0.65 + salinity * 0.35), 4)
+    productivity = productivity_pressure(payload.mean_chlorophyll_a)
+    hydrodynamic, speed = hydrodynamic_attachment_score(payload.mean_current_u, payload.mean_current_v)
+    environment = round(
+        clamp(temperature * 0.40 + salinity * 0.20 + productivity * 0.25 + hydrodynamic * 0.15),
+        4,
+    )
+    multiplier = round(0.7 + 0.3 * environment, 4)
+    return {
+        "temperature": temperature,
+        "salinity": salinity,
+        "physiology": physiology,
+        "productivity": productivity,
+        "hydrodynamic": hydrodynamic,
+        "current_speed": speed,
+        "environment": environment,
+        "multiplier": multiplier,
+    }
+
+
 def compute_fpi(payload: ScoreEstimateRequest) -> tuple[float, ComponentScores]:
     behavior = behavior_score(payload)
-    environment = environment_score(payload)
+    environment = environment_components(payload)
     maintenance = maintenance_score(payload)
-    fpi = round(behavior * 0.5 + environment * 0.3 + maintenance * 0.2, 4)
+    fpi = round(clamp(behavior * environment["multiplier"]), 4)
     return fpi, ComponentScores(
         behavior_score=behavior,
-        environment_score=environment,
+        temperature_score=environment["temperature"],  # type: ignore[arg-type]
+        salinity_score=environment["salinity"],  # type: ignore[arg-type]
+        physiology_score=environment["physiology"],  # type: ignore[arg-type]
+        productivity_score=environment["productivity"],  # type: ignore[arg-type]
+        hydrodynamic_score=environment["hydrodynamic"],  # type: ignore[arg-type]
+        current_speed=environment["current_speed"],  # type: ignore[arg-type]
+        environment_score=environment["environment"],  # type: ignore[arg-type]
+        environment_multiplier=environment["multiplier"],  # type: ignore[arg-type]
         maintenance_score=maintenance,
     )
 
 
-def compute_ecp(payload: ScoreEstimateRequest, fpi: float) -> float:
-    warm_multiplier = 1.0
-    if payload.mean_sst is not None and payload.mean_sst >= 28:
-        warm_multiplier += 0.15
-    if payload.mean_chlorophyll_a is not None and payload.mean_chlorophyll_a >= 0.5:
-        warm_multiplier += 0.10
-    if payload.low_speed_hours >= 48:
-        warm_multiplier += 0.05
-    return round(clamp(fpi * warm_multiplier, 0.0, 1.5), 4)
+def compute_ecp(payload: ScoreEstimateRequest, fpi: float, components: ComponentScores) -> float:
+    low_speed_pressure = normalize_hours(payload.low_speed_hours, 96)
+    penalty_multiplier = (
+        1.0
+        + 0.18 * components.maintenance_score
+        + 0.12 * components.productivity_score
+        + 0.08 * components.temperature_score
+        + 0.07 * low_speed_pressure
+    )
+    return round(clamp(fpi * penalty_multiplier, 0.0, 1.5), 4)
 
 
 def compute_rri(payload: ScoreEstimateRequest, components: ComponentScores) -> float:
@@ -74,7 +188,7 @@ def recommend_action(fpi: float, ecp: float) -> str:
 
 def estimate_scores(payload: ScoreEstimateRequest) -> ScoreEstimateResponse:
     fpi, components = compute_fpi(payload)
-    ecp = compute_ecp(payload, fpi)
+    ecp = compute_ecp(payload, fpi, components)
     rri = compute_rri(payload, components)
     return ScoreEstimateResponse(
         vessel_id=payload.vessel_id,
@@ -84,4 +198,3 @@ def estimate_scores(payload: ScoreEstimateRequest) -> ScoreEstimateResponse:
         recommendation=recommend_action(fpi, ecp),
         components=components,
     )
-

@@ -15,6 +15,38 @@ def test_health_endpoint_returns_ok() -> None:
     assert response.json() == {"status": "ok", "version": "0.1.0"}
 
 
+def test_scoring_endpoint_returns_scientific_components() -> None:
+    response = client.post(
+        "/scoring/estimate",
+        json={
+            "vessel_id": "demo-vessel",
+            "dwell_hours": 48,
+            "anchor_hours": 36,
+            "low_speed_hours": 60,
+            "port_visits": 4,
+            "maintenance_gap_days": 120,
+            "mean_sst": 28.5,
+            "mean_salinity": 32.0,
+            "mean_chlorophyll_a": 0.8,
+            "mean_current_u": 0.24,
+            "mean_current_v": -0.11,
+            "traffic_density_index": 0.7,
+            "anchorage_exposure_index": 0.6,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["fpi_score"] == 0.4398
+    assert payload["ecp_score"] == 0.5575
+    assert payload["components"]["temperature_score"] == 0.9375
+    assert payload["components"]["salinity_score"] == 0.9357
+    assert payload["components"]["productivity_score"] == 0.24
+    assert payload["components"]["hydrodynamic_score"] == 1.0
+    assert payload["components"]["environment_score"] == 0.7721
+    assert payload["components"]["environment_multiplier"] == 0.9316
+
+
 def test_demo_summary_endpoint_returns_real_counts() -> None:
     response = client.get("/api/demo/summary")
     payload = response.json()

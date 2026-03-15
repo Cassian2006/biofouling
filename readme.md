@@ -1902,3 +1902,47 @@ project/
   - `observation_insufficient = 151`
 
 详细说明见 `docs/competition_baseline.md`。
+
+62. 科学性已提升为第一优先级升级（2026-03-15）
+当前已正式启动“科学性优先”升级，重点不在新增页面数量，而在收紧评分结构、参数解释和答辩口径。
+
+本轮已完成的核心动作：
+- 环境因子区间响应重构
+  - 新评分结构已从“多个变量各自单调加分”切换为：
+    - 生理适宜层：`sst + salinity`
+    - 生产力压力层：`chlorophyll_a`
+    - 附着水动力层：`current_speed = sqrt(u^2 + v^2)`
+    - 行为暴露修正层：`low_speed / anchor / dwell / port proximity`
+- 整体科学性 review
+  - 已新增 `docs/scientific_review.md`
+  - 已按 FPI / ECP / RRI / 异常检测 / 时序预测分别标注：
+    - 文献或机理支撑
+    - 工程启发式部分
+    - 相对排序与绝对判断边界
+- 产品界面科学解释层
+  - 前端“核心算法”说明已升级为科学解释层，加入：
+    - 评分新结构
+    - 参数来源口径
+    - 科学边界
+    - LSTM 与 Autoencoder 的定位说明
+
+本轮新增文档：
+- `docs/scientific_review.md`
+- `docs/scoring_rationale.md`
+- `docs/parameter_sources.md`
+
+本轮新增分析产物：
+- `outputs/science/scoring_comparison_20260115_20260130.csv`
+- `outputs/science/scoring_comparison_summary.json`
+- `outputs/science/scoring_v1_vs_v2.png`
+
+当前对比摘要：
+- `legacy_fpi_mean = 0.6151`
+- `scientific_fpi_mean = 0.1668`
+- `legacy_ecp_mean = 0.6209`
+- `scientific_ecp_mean = 0.2024`
+
+当前解释：
+- 新评分显著压低了旧版单调加分逻辑下的整体风险水平
+- 原因不是风险被“削弱”了，而是环境项不再单独主导，行为暴露重新成为主因
+- 这一变化更符合 IMO 风险逻辑，也更适合作为答辩时的科学表达口径

@@ -3,7 +3,7 @@ import pandas as pd
 from scripts.build_features import build_vessel_features, prepare_ais, prepare_env
 
 
-def test_build_vessel_features_keeps_extended_environment_columns() -> None:
+def test_build_vessel_features_outputs_scientific_and_legacy_scores() -> None:
     ais = prepare_ais(
         pd.DataFrame(
             [
@@ -13,6 +13,7 @@ def test_build_vessel_features_keeps_extended_environment_columns() -> None:
                     "latitude": 1.20,
                     "longitude": 103.50,
                     "is_low_speed": True,
+                    "nav_status": 1,
                 },
                 {
                     "mmsi": "123456789",
@@ -20,6 +21,7 @@ def test_build_vessel_features_keeps_extended_environment_columns() -> None:
                     "latitude": 1.21,
                     "longitude": 103.51,
                     "is_low_speed": False,
+                    "nav_status": 5,
                 },
             ]
         )
@@ -49,3 +51,13 @@ def test_build_vessel_features_keeps_extended_environment_columns() -> None:
     assert features.loc[0, "mean_salinity"] == 33.1
     assert features.loc[0, "mean_current_u"] == 0.24
     assert features.loc[0, "mean_current_v"] == -0.11
+    assert features.loc[0, "anchor_hours"] == 1.0
+    assert features.loc[0, "dwell_hours"] == 1.0
+    assert features.loc[0, "low_speed_hours"] == 1.0
+    assert features.loc[0, "fpi_proxy_legacy"] == 0.3
+    assert features.loc[0, "ecp_proxy_legacy"] == 0.36
+    assert features.loc[0, "temperature_score"] > 0
+    assert features.loc[0, "salinity_score"] > 0
+    assert features.loc[0, "hydrodynamic_score"] > 0
+    assert features.loc[0, "fpi_proxy"] >= 0
+    assert features.loc[0, "ecp_proxy"] >= 0
