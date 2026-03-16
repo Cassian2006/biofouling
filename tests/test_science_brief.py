@@ -4,6 +4,7 @@ from scripts.build_science_brief import (
     classify_priority,
     plain_language_takeaways,
     render_html_report,
+    render_scientific_statement_html,
 )
 
 
@@ -51,6 +52,12 @@ def test_render_html_report_includes_figure_notes(tmp_path) -> None:
                     "fpi_delta": -0.6,
                     "behavior_score": 0.4,
                     "environment_score": 0.7,
+                    "ecp_proxy_legacy": 0.82,
+                    "ecp_proxy_scientific": 0.24,
+                    "temperature_score": 0.6,
+                    "salinity_score": 0.5,
+                    "productivity_score": 0.7,
+                    "hydrodynamic_score": 0.4,
                 }
             ]
         ),
@@ -61,3 +68,18 @@ def test_render_html_report_includes_figure_notes(tmp_path) -> None:
     assert "这张图看的是整体分布" in html_text
     assert "EnvModifier = 0.40T + 0.20S + 0.25P + 0.15H" in html_text
     assert "FPI = BehaviorExposure × EnvAdj × MaintenanceAdj" in html_text
+
+
+def test_render_scientific_statement_html_exports_formal_material(tmp_path) -> None:
+    statement = tmp_path / "scientific_statement.md"
+    statement.write_text(
+        "# 科学性说明\n\n## FPI\n\n- 行为主导\n- 环境修正\n- 维护轻修正\n\n## ECP\n\n不是正式碳核算。\n",
+        encoding="utf-8",
+    )
+
+    render_scientific_statement_html(tmp_path, statement)
+
+    html_text = (tmp_path / "scientific_statement.html").read_text(encoding="utf-8")
+    assert "科学性说明正式材料" in html_text
+    assert "行为主导" in html_text
+    assert "不是正式碳核算" in html_text

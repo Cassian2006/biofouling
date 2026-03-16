@@ -1,6 +1,7 @@
 import argparse
 import html
 import json
+import re
 import shutil
 from pathlib import Path
 
@@ -556,6 +557,249 @@ RRI = 0.40 × EnvModifier + 0.25 × Traffic + 0.20 × StayProb + 0.15 × PortAnc
 </html>
 """
     (output_dir / "science_upgrade_brief.html").write_text(html_text, encoding="utf-8")
+
+
+def markdown_to_html(markdown_text: str) -> str:
+    lines = markdown_text.splitlines()
+    html_parts: list[str] = []
+    in_ul = False
+    in_ol = False
+    in_code = False
+    code_lines: list[str] = []
+
+    def close_lists() -> None:
+        nonlocal in_ul, in_ol
+        if in_ul:
+            html_parts.append("</ul>")
+            in_ul = False
+        if in_ol:
+            html_parts.append("</ol>")
+            in_ol = False
+
+    def inline(text: str) -> str:
+        escaped = html.escape(text)
+        escaped = re.sub(r"`([^`]+)`", r"<code>\1</code>", escaped)
+        return escaped
+
+    for raw_line in lines:
+        line = raw_line.rstrip()
+        stripped = line.strip()
+
+        if stripped.startswith("```"):
+            if in_code:
+                html_parts.append(
+                    '<pre class="doc-code"><code>'
+                    + html.escape("\n".join(code_lines))
+                    + "</code></pre>"
+                )
+                code_lines = []
+                in_code = False
+            else:
+                close_lists()
+                in_code = True
+            continue
+
+        if in_code:
+            code_lines.append(line)
+            continue
+
+        if not stripped:
+            close_lists()
+            continue
+
+        if stripped.startswith("# "):
+            close_lists()
+            html_parts.append(f"<h1>{inline(stripped[2:])}</h1>")
+            continue
+        if stripped.startswith("## "):
+            close_lists()
+            html_parts.append(f"<h2>{inline(stripped[3:])}</h2>")
+            continue
+        if stripped.startswith("### "):
+            close_lists()
+            html_parts.append(f"<h3>{inline(stripped[4:])}</h3>")
+            continue
+
+        if re.match(r"^\d+\.\s+", stripped):
+            if not in_ol:
+                close_lists()
+                html_parts.append("<ol>")
+                in_ol = True
+            item = re.sub(r"^\d+\.\s+", "", stripped)
+            html_parts.append(f"<li>{inline(item)}</li>")
+            continue
+
+        if stripped.startswith("- "):
+            if not in_ul:
+                close_lists()
+                html_parts.append("<ul>")
+                in_ul = True
+            html_parts.append(f"<li>{inline(stripped[2:])}</li>")
+            continue
+
+        close_lists()
+        html_parts.append(f"<p>{inline(stripped)}</p>")
+
+    close_lists()
+    if in_code:
+        html_parts.append(
+            '<pre class="doc-code"><code>'
+            + html.escape("\n".join(code_lines))
+            + "</code></pre>"
+        )
+
+    return "\n".join(html_parts)
+
+
+def render_scientific_statement_html(
+    output_dir: Path, scientific_statement_path: Path
+) -> None:
+    markdown_text = scientific_statement_path.read_text(encoding="utf-8")
+    body_html = markdown_to_html(markdown_text)
+
+    html_text = f"""<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>科学性说明</title>
+  <style>
+    body {{
+      margin: 0;
+      font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+      background: #f4f7fb;
+      color: #162033;
+    }}
+    .page {{
+      width: min(1040px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 28px 0 48px;
+    }}
+    .hero, .doc-panel, .source-card {{
+      background: #fff;
+      border: 1px solid #d8e0ee;
+      border-radius: 18px;
+      box-shadow: 0 18px 48px rgba(15, 23, 42, 0.08);
+    }}
+    .hero {{
+      padding: 26px 28px;
+      margin-bottom: 18px;
+    }}
+    .hero h1 {{
+      margin: 0 0 12px;
+      font-size: 34px;
+      line-height: 1.15;
+    }}
+    .hero p {{
+      margin: 0;
+      color: #334155;
+      line-height: 1.8;
+    }}
+    .kicker {{
+      margin: 0 0 8px;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      color: #2563eb;
+      text-transform: uppercase;
+      font-weight: 700;
+    }}
+    .sources {{
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }}
+    .source-card {{
+      padding: 16px;
+    }}
+    .source-card h3 {{
+      margin: 0 0 8px;
+      font-size: 17px;
+    }}
+    .source-card p {{
+      margin: 0;
+      color: #475569;
+      line-height: 1.7;
+      font-size: 14px;
+    }}
+    .doc-panel {{
+      padding: 26px 28px;
+    }}
+    .doc-panel h1 {{
+      margin: 0 0 16px;
+      font-size: 30px;
+    }}
+    .doc-panel h2 {{
+      margin: 28px 0 10px;
+      font-size: 24px;
+    }}
+    .doc-panel h3 {{
+      margin: 20px 0 8px;
+      font-size: 18px;
+    }}
+    .doc-panel p, .doc-panel li {{
+      line-height: 1.85;
+      color: #334155;
+      font-size: 15px;
+    }}
+    .doc-panel ul, .doc-panel ol {{
+      padding-left: 22px;
+      margin: 8px 0 14px;
+    }}
+    .doc-panel code {{
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: #eef4ff;
+      color: #1d4ed8;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.95em;
+    }}
+    .doc-code {{
+      margin: 12px 0 18px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      background: #0f172a;
+      color: #e2e8f0;
+      overflow-x: auto;
+      line-height: 1.7;
+    }}
+    @media (max-width: 900px) {{
+      .sources {{
+        grid-template-columns: 1fr;
+      }}
+    }}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <p class="kicker">Scientific Statement</p>
+      <h1>科学性说明正式材料</h1>
+      <p>这份页面用于直接说明平台当前能回答什么、不能回答什么，以及各评分与深度模块在竞赛语境下应如何被准确解释。它不是源码说明，而是面向答辩、评审和项目汇报的正式口径材料。</p>
+    </section>
+
+    <section class="sources">
+      <article class="source-card">
+        <h3>FPI / ECP / RRI</h3>
+        <p>聚焦三类核心评分的职责边界，解释为什么 FPI 是行为主导，为什么 ECP 不是正式碳核算，为什么 RRI 不是“真实污损地图”。</p>
+      </article>
+      <article class="source-card">
+        <h3>LSTM 与异常检测</h3>
+        <p>区分短期趋势预测与异常筛查两条深度模块，明确哪些对象可预测、哪些对象只能做筛查解释。</p>
+      </article>
+      <article class="source-card">
+        <h3>机制支撑与启发式边界</h3>
+        <p>把已有机制支撑、当前仍属工程启发式近似，以及已经完成和仍待补强的部分统一写清，便于评审时快速说明。</p>
+      </article>
+    </section>
+
+    <section class="doc-panel">
+      {body_html}
+    </section>
+  </div>
+</body>
+</html>
+"""
+    (output_dir / "scientific_statement.html").write_text(html_text, encoding="utf-8")
 
 
 def main() -> None:

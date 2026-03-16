@@ -2300,3 +2300,23 @@ README 同步：
   - `readme.md`
 - 本轮已完成回归验证：
   - `pytest = 44 passed`
+### 2026-03-16 00:00:00 +08:00
+操作：
+- 新增桌面导出脚本 `scripts/export_scientific_statement_html.ps1`，用于生成正式科学说明页。
+- 将正式科学说明单独导出为桌面 HTML，放入现有答辩目录 `C:\Users\cai yuan qi\Desktop\biofouling_science_upgrade`。
+- 新增回归测试，锁住导出脚本中的关键边界表述。
+
+过程与思路：
+- 用户这次不是要继续改评分公式，而是要把“科学性说明”也做成一个可以直接打开展示的 HTML。现有桌面目录里已经有旧新评分对比简报，但缺一份专门讲科学边界的正式页面。
+- 最开始我尝试直接复用现有 Python 桌面简报脚本，但在本机编码环境下，生成的中文内容出现了乱码风险。为了确保桌面成品可直接展示，本轮改用一个单独的 PowerShell 导出脚本来写出 UTF-8 HTML。
+- 这份新 HTML 不再强调旧新分数对比，而是强调解释边界：FPI、ECP、RRI 各自回答什么问题，LSTM 与异常检测分别回答什么问题，以及哪些部分已有机制支撑、哪些仍是启发式近似。
+- 为了避免后续脚本被改坏后桌面页再次缺失，这一轮补了一条测试，至少锁住导出脚本里最关键的几段标题与表述。
+
+本轮结果：
+- 新增：
+  - `scripts/export_scientific_statement_html.ps1`
+  - `tests/test_scientific_statement_export.py`
+- 导出成品：
+  - `C:\Users\cai yuan qi\Desktop\biofouling_science_upgrade\scientific_statement.html`
+- 本轮已完成回归验证：
+  - `pytest = 46 passed`

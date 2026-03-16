@@ -2040,3 +2040,22 @@ project/
 
 当前验证状态：
 - `pytest = 44 passed`
+66. Scientific statement desktop HTML exported (2026-03-16)
+This round adds a dedicated desktop HTML for the formal scientific statement, separate from the score-comparison briefing. The new page focuses on scope boundaries and answerable questions, rather than old-vs-new score visuals.
+
+Export target:
+- `C:\Users\cai yuan qi\Desktop\biofouling_science_upgrade\scientific_statement.html`
+
+Key contents:
+- Why `FPI` is behavior-led with environment and maintenance as modifiers
+- Why `ECP` is a relative penalty indicator rather than formal carbon accounting
+- Why `RRI` is a regional composite risk layer rather than a real fouling map
+- What `LSTM` predicts and what anomaly detection screens
+- Which parts already have mechanism support and which parts remain heuristic
+
+Supporting files:
+- `scripts/export_scientific_statement_html.ps1`
+- `tests/test_scientific_statement_export.py`
+
+Validation status:
+- `pytest = 46 passed`
