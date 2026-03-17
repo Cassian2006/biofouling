@@ -82,15 +82,15 @@ def test_estimate_scores_returns_expected_scientific_baseline_case() -> None:
     result = estimate_scores(payload)
 
     assert result.vessel_id == "demo-vessel"
-    assert result.fpi_score == 0.5276
-    assert result.ecp_score == 0.6162
-    assert result.rri_score == 0.6433
+    assert result.fpi_score == 0.5211
+    assert result.ecp_score == 0.6086
+    assert result.rri_score == 0.6254
     assert result.components.temperature_score == 0.9375
     assert result.components.salinity_score == 0.9357
     assert result.components.productivity_score == 0.24
-    assert result.components.hydrodynamic_score == 1.0
-    assert result.components.environment_score == 0.7721
-    assert result.components.environment_multiplier == 1.0816
+    assert result.components.hydrodynamic_score == 0.701
+    assert result.components.environment_score == 0.7273
+    assert result.components.environment_multiplier == 1.0682
     assert result.components.maintenance_multiplier == 1.0333
     assert result.components.carbon_penalty_multiplier == 1.168
     assert result.recommendation == "Prioritize cleaning assessment"

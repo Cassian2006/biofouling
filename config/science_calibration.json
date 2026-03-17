@@ -1,0 +1,21 @@
+{
+  "version": "science_calibration_v1",
+  "window_label": "20260115 to 20260130",
+  "current_speed_quantiles": {
+    "p25": 0.1745,
+    "p50": 0.249,
+    "p75": 0.3561,
+    "p90": 0.4651,
+    "max": 0.6999
+  },
+  "recommendation_thresholds": {
+    "fpi_prioritize": 0.25,
+    "ecp_prioritize": 0.3,
+    "fpi_monitor": 0.08,
+    "ecp_monitor": 0.1
+  },
+  "maintenance": {
+    "default_gap_days": 90.0,
+    "source": "neutral_default_without_external_maintenance_records"
+  }
+}

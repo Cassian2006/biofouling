@@ -2320,3 +2320,33 @@ README 同步：
   - `C:\Users\cai yuan qi\Desktop\biofouling_science_upgrade\scientific_statement.html`
 - 本轮已完成回归验证：
   - `pytest = 46 passed`
+### 2026-03-17 00:00:00 +08:00
+操作：
+- 将评分中的剩余硬编码启发式收紧为“可校准配置 + 显式默认值”。
+- 新增科学校准配置与生成脚本，并刷新科学对比产物。
+- 为维护间隔默认值与可选覆盖补充测试和输出字段。
+
+过程与思路：
+- 用户这轮要求继续优化启发式计算，而不是继续扩展功能模块。因此优先处理影响最大的两类问题：第一类是 `current_speed` 的固定分位常量，这会直接影响水动力附着项；第二类是 `maintenance_gap_days=90` 这种埋在特征构建里的默认值，它虽然中性，但解释性不够。
+- 处理原则不是继续在源码里换一组新常数，而是把这些值抽成一份独立校准配置。这样后续如果切换时间窗或想重做科学校准，只需要重跑校准脚本，而不是改业务代码。
+- 这轮没有激进改写主分级逻辑。分级阈值也被放进校准配置，但仍维持当前稳定口径，避免为了“去启发式”而把前端展示和竞赛结论打散。
+- 对维护项，这轮不假装从 AIS 行为里反推出真实维护记录，而是明确区分两种来源：有外部覆盖时用真实覆盖值，没有覆盖时使用“校准默认值”。这样比继续在代码里偷偷写死一个数字更诚实，也更利于后面接入真实维护数据。
+- 最后重跑了科学对比脚本和桌面材料，确保现在你看到的对比图和桌面 HTML 都对应这轮收紧后的参数，而不是旧一轮的产物。
+
+本轮结果：
+- 新增：
+  - `config/science_calibration.json`
+  - `scripts/build_science_calibration.py`
+  - `tests/test_science_calibration.py`
+- 更新：
+  - `backend/services/scoring.py`
+  - `scripts/build_features.py`
+  - `outputs/science/scoring_comparison_20260115_20260130.csv`
+  - `outputs/science/scoring_comparison_summary.json`
+  - `outputs/science/scoring_v1_vs_v2.png`
+- 关键变化：
+  - `current_speed` 分位点改为从冻结环境样本校准
+  - 推荐阈值改为从校准配置读取
+  - 维护间隔默认值改为显式配置，并支持 override
+- 本轮已完成回归验证：
+  - `pytest = 50 passed`

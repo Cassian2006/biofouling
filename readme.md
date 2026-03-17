@@ -2059,3 +2059,33 @@ Supporting files:
 
 Validation status:
 - `pytest = 46 passed`
+67. Heuristic calibration tightened (2026-03-17)
+This round focuses on reducing a few remaining hard-coded heuristic assumptions and replacing them with explicit calibration inputs.
+
+What changed:
+- Added calibration config:
+  - `config/science_calibration.json`
+- Added calibration builder:
+  - `scripts/build_science_calibration.py`
+- Scoring now reads:
+  - current-speed breakpoints from calibration config
+  - recommendation thresholds from calibration config
+  - default maintenance-gap prior from calibration config
+- Feature building now supports:
+  - optional maintenance overrides file
+  - explicit default maintenance-gap configuration
+  - output columns `maintenance_gap_days_used` and `maintenance_gap_source`
+
+What became less heuristic:
+- `current_speed` no longer relies on fixed source-code constants; it is now calibrated from the frozen environment dataset.
+- Default maintenance-gap usage is no longer hidden in scoring code as an unexplained `90`-day constant; it is now explicit and configurable.
+- Recommendation thresholds are now sourced from calibration config rather than embedded directly in the scoring module.
+
+Updated comparison summary after this tightening:
+- `legacy_fpi_mean = 0.6151`
+- `scientific_fpi_mean = 0.1928`
+- `legacy_ecp_mean = 0.6209`
+- `scientific_ecp_mean = 0.2189`
+
+Validation status:
+- `pytest = 50 passed`

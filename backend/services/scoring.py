@@ -1,21 +1,72 @@
 import math
+import json
+from functools import lru_cache
+from pathlib import Path
 
 from backend.schemas.scoring import ComponentScores, ScoreEstimateRequest, ScoreEstimateResponse
 
-
-CURRENT_SPEED_P25 = 0.3303
-CURRENT_SPEED_P50 = 0.3685
-CURRENT_SPEED_P75 = 0.4189
-CURRENT_SPEED_P90 = 0.4610
-CURRENT_SPEED_MAX = 0.5820
-FPI_PRIORITIZE_THRESHOLD = 0.25
-ECP_PRIORITIZE_THRESHOLD = 0.30
-FPI_MONITOR_THRESHOLD = 0.08
-ECP_MONITOR_THRESHOLD = 0.10
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+SCIENCE_CALIBRATION_PATH = PROJECT_ROOT / "config" / "science_calibration.json"
 
 
 def clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
     return max(lower, min(upper, value))
+
+
+@lru_cache(maxsize=1)
+def load_science_calibration() -> dict[str, object]:
+    if not SCIENCE_CALIBRATION_PATH.exists():
+        return {
+            "current_speed_quantiles": {
+                "p25": 0.1745,
+                "p50": 0.2490,
+                "p75": 0.3561,
+                "p90": 0.4651,
+                "max": 0.6999,
+            },
+            "recommendation_thresholds": {
+                "fpi_prioritize": 0.25,
+                "ecp_prioritize": 0.30,
+                "fpi_monitor": 0.08,
+                "ecp_monitor": 0.10,
+            },
+            "maintenance": {
+                "default_gap_days": 90.0,
+            },
+        }
+    return json.loads(SCIENCE_CALIBRATION_PATH.read_text(encoding="utf-8"))
+
+
+def current_speed_quantiles() -> dict[str, float]:
+    values = load_science_calibration().get("current_speed_quantiles", {})
+    if not isinstance(values, dict):
+        raise ValueError("Invalid current_speed_quantiles in science calibration config")
+    return {
+        "p25": float(values["p25"]),
+        "p50": float(values["p50"]),
+        "p75": float(values["p75"]),
+        "p90": float(values["p90"]),
+        "max": float(values["max"]),
+    }
+
+
+def recommendation_thresholds() -> dict[str, float]:
+    values = load_science_calibration().get("recommendation_thresholds", {})
+    if not isinstance(values, dict):
+        raise ValueError("Invalid recommendation_thresholds in science calibration config")
+    return {
+        "fpi_prioritize": float(values["fpi_prioritize"]),
+        "ecp_prioritize": float(values["ecp_prioritize"]),
+        "fpi_monitor": float(values["fpi_monitor"]),
+        "ecp_monitor": float(values["ecp_monitor"]),
+    }
+
+
+def default_maintenance_gap_days() -> float:
+    values = load_science_calibration().get("maintenance", {})
+    if not isinstance(values, dict):
+        return 90.0
+    return float(values.get("default_gap_days", 90.0))
 
 
 def normalize_hours(hours: float, full_scale: float) -> float:
@@ -90,13 +141,14 @@ def hydrodynamic_attachment_score(mean_current_u: float | None, mean_current_v: 
     speed = current_speed(mean_current_u, mean_current_v)
     if speed is None:
         return 0.0, None
+    quantiles = current_speed_quantiles()
     breakpoints = [
         (0.0, 1.00),
-        (CURRENT_SPEED_P25, 1.00),
-        (CURRENT_SPEED_P50, 0.75),
-        (CURRENT_SPEED_P75, 0.40),
-        (CURRENT_SPEED_P90, 0.18),
-        (CURRENT_SPEED_MAX, 0.05),
+        (quantiles["p25"], 1.00),
+        (quantiles["p50"], 0.75),
+        (quantiles["p75"], 0.40),
+        (quantiles["p90"], 0.18),
+        (quantiles["max"], 0.05),
     ]
     score = clamp(piecewise_linear(speed, breakpoints))
     return round(score, 4), speed
@@ -208,9 +260,10 @@ def compute_rri(payload: ScoreEstimateRequest, components: ComponentScores) -> f
 
 
 def recommend_action(fpi: float, ecp: float) -> str:
-    if fpi >= FPI_PRIORITIZE_THRESHOLD or ecp >= ECP_PRIORITIZE_THRESHOLD:
+    thresholds = recommendation_thresholds()
+    if fpi >= thresholds["fpi_prioritize"] or ecp >= thresholds["ecp_prioritize"]:
         return "Prioritize cleaning assessment"
-    if fpi >= FPI_MONITOR_THRESHOLD or ecp >= ECP_MONITOR_THRESHOLD:
+    if fpi >= thresholds["fpi_monitor"] or ecp >= thresholds["ecp_monitor"]:
         return "Monitor exposure trend"
     return "Low immediate concern"
 

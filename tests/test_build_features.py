@@ -1,6 +1,11 @@
 import pandas as pd
 
-from scripts.build_features import build_vessel_features, prepare_ais, prepare_env
+from scripts.build_features import (
+    build_vessel_features_with_scoring,
+    load_maintenance_overrides,
+    prepare_ais,
+    prepare_env,
+)
 
 
 def test_build_vessel_features_outputs_scientific_and_legacy_scores() -> None:
@@ -43,7 +48,7 @@ def test_build_vessel_features_outputs_scientific_and_legacy_scores() -> None:
         )
     )
 
-    features = build_vessel_features(ais, env)
+    features = build_vessel_features_with_scoring(ais, env)
 
     assert len(features) == 1
     assert features.loc[0, "mean_sst"] == 28.4
@@ -61,3 +66,56 @@ def test_build_vessel_features_outputs_scientific_and_legacy_scores() -> None:
     assert features.loc[0, "hydrodynamic_score"] > 0
     assert features.loc[0, "fpi_proxy"] >= 0
     assert features.loc[0, "ecp_proxy"] >= 0
+    assert features.loc[0, "maintenance_gap_days_used"] == 90.0
+    assert features.loc[0, "maintenance_gap_source"] == "calibrated_default"
+
+
+def test_build_vessel_features_applies_maintenance_overrides() -> None:
+    ais = prepare_ais(
+        pd.DataFrame(
+            [
+                {
+                    "mmsi": "123456789",
+                    "timestamp": "2026-01-15T01:00:00Z",
+                    "latitude": 1.20,
+                    "longitude": 103.50,
+                    "is_low_speed": True,
+                    "nav_status": 1,
+                }
+            ]
+        )
+    )
+    env = prepare_env(
+        pd.DataFrame(
+            [
+                {
+                    "timestamp": "2026-01-15T00:00:00Z",
+                    "latitude": 1.20,
+                    "longitude": 103.50,
+                    "sst": 28.4,
+                    "chlorophyll_a": 0.18,
+                    "salinity": 33.1,
+                    "current_u": 0.24,
+                    "current_v": -0.11,
+                }
+            ]
+        )
+    )
+    overrides = pd.DataFrame([{"mmsi": "123456789", "maintenance_gap_days": 140}])
+
+    features = build_vessel_features_with_scoring(ais, env, maintenance_overrides=overrides)
+
+    assert features.loc[0, "maintenance_gap_days_used"] == 140
+    assert features.loc[0, "maintenance_gap_source"] == "override"
+
+
+def test_load_maintenance_overrides_requires_expected_columns(tmp_path) -> None:
+    override_path = tmp_path / "maintenance.csv"
+    pd.DataFrame([{"mmsi": "123456789", "maintenance_gap_days": 100}]).to_csv(
+        override_path, index=False
+    )
+
+    overrides = load_maintenance_overrides(override_path)
+
+    assert list(overrides.columns) == ["mmsi", "maintenance_gap_days"]
+    assert overrides.loc[0, "mmsi"] == "123456789"

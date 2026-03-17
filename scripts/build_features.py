@@ -10,7 +10,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from backend.schemas.scoring import ScoreEstimateRequest
-from backend.services.scoring import estimate_scores
+from backend.services.scoring import default_maintenance_gap_days, estimate_scores
 
 
 AIS_REQUIRED_COLUMNS = ["mmsi", "timestamp", "latitude", "longitude", "is_low_speed"]
@@ -31,6 +31,17 @@ def parse_args() -> argparse.Namespace:
         "--output",
         default="data/processed/vessel_features.csv",
         help="Path to feature CSV output.",
+    )
+    parser.add_argument(
+        "--maintenance-overrides",
+        required=False,
+        help="Optional CSV with mmsi,maintenance_gap_days overrides.",
+    )
+    parser.add_argument(
+        "--maintenance-gap-days-default",
+        type=float,
+        default=None,
+        help="Default maintenance gap days when no override exists. Falls back to science calibration config.",
     )
     return parser.parse_args()
 
@@ -85,6 +96,19 @@ def load_reference_ports() -> pd.DataFrame:
     reference["latitude"] = pd.to_numeric(reference["latitude"], errors="coerce")
     reference["longitude"] = pd.to_numeric(reference["longitude"], errors="coerce")
     return reference.dropna(subset=["latitude", "longitude"]).reset_index(drop=True)
+
+
+def load_maintenance_overrides(path: Path | None) -> pd.DataFrame:
+    if path is None or not path.exists():
+        return pd.DataFrame(columns=["mmsi", "maintenance_gap_days"])
+    overrides = load_csv(path)
+    if "mmsi" not in overrides.columns or "maintenance_gap_days" not in overrides.columns:
+        raise ValueError("Maintenance overrides must include 'mmsi' and 'maintenance_gap_days'")
+    overrides["mmsi"] = overrides["mmsi"].astype(str)
+    overrides["maintenance_gap_days"] = pd.to_numeric(
+        overrides["maintenance_gap_days"], errors="coerce"
+    )
+    return overrides.dropna(subset=["maintenance_gap_days"])[["mmsi", "maintenance_gap_days"]]
 
 
 def attach_environment(ais: pd.DataFrame, env: pd.DataFrame) -> pd.DataFrame:
@@ -238,10 +262,31 @@ def summarize_behavior_exposure(ais_enriched: pd.DataFrame) -> pd.DataFrame:
     return features
 
 
-def apply_scientific_scores(features: pd.DataFrame) -> pd.DataFrame:
+def apply_scientific_scores(
+    features: pd.DataFrame,
+    maintenance_overrides: pd.DataFrame | None = None,
+    maintenance_gap_days_default: float | None = None,
+) -> pd.DataFrame:
     scored = features.copy()
     scored["fpi_proxy_legacy"] = legacy_fpi_proxy(scored).round(4)
     scored["ecp_proxy_legacy"] = legacy_ecp_proxy(scored).round(4)
+    default_gap = (
+        float(maintenance_gap_days_default)
+        if maintenance_gap_days_default is not None
+        else default_maintenance_gap_days()
+    )
+
+    if maintenance_overrides is not None and not maintenance_overrides.empty:
+        scored = scored.merge(maintenance_overrides, on="mmsi", how="left")
+    else:
+        scored["maintenance_gap_days"] = np.nan
+
+    scored["maintenance_gap_days_used"] = scored["maintenance_gap_days"].fillna(default_gap)
+    scored["maintenance_gap_source"] = np.where(
+        scored["maintenance_gap_days"].notna(),
+        "override",
+        "calibrated_default",
+    )
 
     results: list[dict[str, float | str | None]] = []
     for row in scored.itertuples(index=False):
@@ -252,7 +297,7 @@ def apply_scientific_scores(features: pd.DataFrame) -> pd.DataFrame:
             low_speed_hours=float(row.low_speed_hours or 0.0),
             port_proximity_hours=float(row.port_proximity_hours or 0.0),
             port_visits=int(row.port_visits or 0),
-            maintenance_gap_days=90.0,
+            maintenance_gap_days=float(row.maintenance_gap_days_used or default_gap),
             mean_sst=float(row.mean_sst) if pd.notna(row.mean_sst) else None,
             mean_salinity=float(row.mean_salinity) if pd.notna(row.mean_salinity) else None,
             mean_chlorophyll_a=float(row.mean_chlorophyll_a) if pd.notna(row.mean_chlorophyll_a) else None,
@@ -288,6 +333,15 @@ def apply_scientific_scores(features: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_vessel_features(ais: pd.DataFrame, env: pd.DataFrame | None) -> pd.DataFrame:
+    return build_vessel_features_with_scoring(ais, env)
+
+
+def build_vessel_features_with_scoring(
+    ais: pd.DataFrame,
+    env: pd.DataFrame | None,
+    maintenance_overrides: pd.DataFrame | None = None,
+    maintenance_gap_days_default: float | None = None,
+) -> pd.DataFrame:
     ais_enriched = attach_environment(ais, env) if env is not None and not env.empty else ais.copy()
     for column in ["sst", *OPTIONAL_ENV_COLUMNS]:
         if column not in ais_enriched.columns:
@@ -295,7 +349,11 @@ def build_vessel_features(ais: pd.DataFrame, env: pd.DataFrame | None) -> pd.Dat
     ais_enriched = add_segment_hours(ais_enriched)
     ais_enriched = mark_port_proximity(ais_enriched, load_reference_ports())
     features = summarize_behavior_exposure(ais_enriched)
-    return apply_scientific_scores(features)
+    return apply_scientific_scores(
+        features,
+        maintenance_overrides=maintenance_overrides,
+        maintenance_gap_days_default=maintenance_gap_days_default,
+    )
 
 
 def save_output(dataframe: pd.DataFrame, path: Path) -> None:
@@ -307,7 +365,13 @@ def main() -> None:
     args = parse_args()
     ais = prepare_ais(load_csv(Path(args.ais)))
     env = prepare_env(load_csv(Path(args.env))) if args.env else None
-    features = build_vessel_features(ais, env)
+    overrides = load_maintenance_overrides(Path(args.maintenance_overrides)) if args.maintenance_overrides else None
+    features = build_vessel_features_with_scoring(
+        ais,
+        env,
+        maintenance_overrides=overrides,
+        maintenance_gap_days_default=args.maintenance_gap_days_default,
+    )
     save_output(features, Path(args.output))
 
     print(f"Vessels summarized: {len(features)}")
