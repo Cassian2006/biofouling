@@ -1,0 +1,7 @@
+scenario_label,scenario_kind,mean_fpi_shift,mean_ecp_shift,top20_overlap,top50_overlap,recommendation_change_rate,prioritize_count,monitor_count,low_concern_count,scenario_name
+温度权重上调,sensitivity,0.0001,0.0001,1.0,1.0,0.0,187,207,243,temp_up
+叶绿素权重上调,sensitivity,-0.0022,-0.0024,1.0,1.0,0.0063,184,209,244,productivity_up
+环境修正收窄,sensitivity,-0.0023,-0.0027,1.0,1.0,0.0047,184,210,243,env_narrow
+环境修正放宽,sensitivity,0.0025,0.0028,1.0,1.0,0.0078,190,206,241,env_wide
+维护修正减弱,sensitivity,0.0001,0.0001,1.0,1.0,0.0,187,207,243,maintenance_soft
+维护修正加强,sensitivity,0.0001,0.0001,1.0,1.0,0.0,187,207,243,maintenance_strong

@@ -2089,3 +2089,46 @@ Updated comparison summary after this tightening:
 
 Validation status:
 - `pytest = 50 passed`
+68. Scientific validation bundle added (2026-03-18)
+This round adds an academic-strength validation layer without changing the frozen competition demo window.
+
+What changed:
+- Added scientific validation helper module:
+  - `backend/services/science_validation.py`
+- Added validation builder:
+  - `scripts/build_science_validation.py`
+- Added validation notes:
+  - `docs/scientific_validation.md`
+- Added tests:
+  - `tests/test_science_validation.py`
+
+What this bundle does:
+- Runs sensitivity checks around the current `science-v2` scoring structure.
+- Runs component ablations for:
+  - temperature
+  - salinity
+  - chlorophyll/productivity
+  - hydrodynamic attachment
+- Exports validation outputs to:
+  - `outputs/science_validation/`
+
+Current results:
+- Baseline recommendation counts:
+  - `Prioritize cleaning assessment = 187`
+  - `Monitor exposure trend = 207`
+  - `Low immediate concern = 243`
+- Sensitivity analysis:
+  - all six tested small-perturbation scenarios kept `Top-20 overlap = 1.00`
+  - all six tested small-perturbation scenarios kept `Top-50 overlap = 1.00`
+  - highest recommendation change rate was `0.78%`
+- Ablation analysis:
+  - removing temperature produced the largest negative average FPI shift: `-0.0104`
+  - removing chlorophyll/productivity produced the largest positive average FPI shift: `+0.0097`
+
+Interpretation:
+- The current scientific scoring is no longer highly fragile to small weight changes.
+- Temperature and chlorophyll remain the two most influential environmental mechanisms in this window.
+- This strengthens the claim that the platform now behaves more like a stable relative-risk system, rather than a handful of arbitrary constants.
+
+Validation status:
+- `pytest = 53 passed`

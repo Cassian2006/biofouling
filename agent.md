@@ -2350,3 +2350,35 @@ README 同步：
   - 维护间隔默认值改为显式配置，并支持 override
 - 本轮已完成回归验证：
   - `pytest = 50 passed`
+### 2026-03-18 00:00:00 +08:00
+操作：
+- 新增一套“学术增强但不改竞赛基线”的科学验证模块。
+- 对当前 science-v2 评分做敏感性分析与分量消融分析。
+- 生成新的验证图表、摘要文件和说明文档。
+
+过程与思路：
+- 这轮目标不是继续改公式，而是验证现在这套公式是否稳。对竞赛项目来说，这比继续堆模型更像真正的学术增强，因为它能回答“参数一变会不会整个结论塌掉”。
+- 我把验证分成两类：第一类是 sensitivity，测试温度权重、叶绿素权重、环境修正幅度、维护修正幅度的小幅变化；第二类是 ablation，分别去掉温度、盐度、叶绿素和水动力分量，看排序和建议分布怎么变。
+- 实现上没有去碰前端和冻结展示样本，而是单独加了一个科学验证服务层与脚本，直接基于 15 天冻结窗口重建 scientific features，再输出到 `outputs/science_validation/`。这样能保留竞赛主版本的稳定性，同时把学术材料补起来。
+- 跑完结果后，当前结论比较明确：小幅参数变化几乎不影响 Top-20 和 Top-50 排序；真正影响较大的还是温度和叶绿素两个机制分量。这说明现在这版 science-v2 不再像早期那样对几个启发式常数非常脆弱。
+
+本轮结果：
+- 新增：
+  - `backend/services/science_validation.py`
+  - `scripts/build_science_validation.py`
+  - `docs/scientific_validation.md`
+  - `tests/test_science_validation.py`
+- 生成：
+  - `outputs/science_validation/sensitivity_summary.csv`
+  - `outputs/science_validation/ablation_summary.csv`
+  - `outputs/science_validation/science_validation_summary.json`
+  - `outputs/science_validation/sensitivity_stability.png`
+  - `outputs/science_validation/ablation_effects.png`
+- 关键结果：
+  - baseline recommendation counts = `187 / 207 / 243`
+  - sensitivity scenarios 全部保持 `Top-20 overlap = 1.00`
+  - 最高 recommendation change rate = `0.78%`
+  - 去掉温度分量后的 `mean_fpi_shift = -0.0104`
+  - 去掉叶绿素分量后的 `mean_fpi_shift = +0.0097`
+- 本轮已完成回归验证：
+  - `pytest = 53 passed`

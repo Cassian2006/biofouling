@@ -1,0 +1,5 @@
+scenario_label,scenario_kind,mean_fpi_shift,mean_ecp_shift,top20_overlap,top50_overlap,recommendation_change_rate,prioritize_count,monitor_count,low_concern_count,scenario_name
+去除温度分量,ablation,-0.0104,-0.0118,1.0,1.0,0.0298,170,222,245,no_temperature
+去除盐度分量,ablation,-0.004,-0.0045,1.0,1.0,0.0078,183,210,244,no_salinity
+去除叶绿素分量,ablation,0.0097,0.011,1.0,1.0,0.0283,200,199,238,no_productivity
+去除水动力分量,ablation,0.0028,0.0032,1.0,1.0,0.0094,189,207,241,no_hydrodynamic

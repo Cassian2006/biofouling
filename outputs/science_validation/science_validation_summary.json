@@ -1,0 +1,13 @@
+{
+  "baseline_label": "当前科学评分",
+  "baseline_recommendation_counts": {
+    "Prioritize cleaning assessment": 187,
+    "Monitor exposure trend": 207,
+    "Low immediate concern": 243
+  },
+  "sensitivity_scenarios": 6,
+  "ablation_scenarios": 4,
+  "most_stable_sensitivity": "温度权重上调",
+  "most_disruptive_ablation": "去除温度分量",
+  "highest_recommendation_change_sensitivity": "环境修正放宽"
+}
