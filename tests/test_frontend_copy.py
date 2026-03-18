@@ -20,11 +20,12 @@ def test_tooltip_and_map_components_exist() -> None:
     assert "map-overlay-badge" in overview_map
     assert "focusedHotspotKeys" in overview_map
     assert "leaflet" in vessel_map.lower()
-    assert "EnvModifier = 0.40T + 0.20S + 0.25P + 0.15H" in method_drawer
-    assert "FPI = BehaviorExposure × EnvAdj × MaintenanceAdj" in method_drawer
-    assert "current_speed" in method_drawer
-    assert "全连接 Autoencoder" in method_drawer
-    assert "单层 LSTM" in method_drawer
+    assert "fetchScienceMaterials" in method_drawer
+    assert "科学验证摘要" in method_drawer
+    assert "维护项口径" in method_drawer
+    assert "fetchScienceMaterials" in method_drawer
+    assert "科学验证摘要" in method_drawer
+    assert "维护项口径" in method_drawer
 
 
 def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
@@ -47,6 +48,9 @@ def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
     assert "长时低速型" in dashboard
     assert "观测稀疏型" in dashboard
     assert "异常类型对比" in dashboard
+    assert "科学验证摘要" in dashboard
+    assert "敏感性分析" in dashboard
+    assert "分量消融" in dashboard
     assert "正常均值" in dashboard
     assert "综合风险分值" in dashboard
     assert "当前切片" in dashboard
@@ -61,6 +65,9 @@ def test_dashboard_and_vessel_pages_use_new_interaction_patterns() -> None:
     assert "trend-window-grid" in vessel
     assert "简要结论" in vessel
     assert "历史-预测链路" in vessel
+    assert "维护项说明" in vessel
+    assert "维护来源" in vessel
+    assert "维护修正系数" in vessel
     assert "主导证据" in vessel
     assert "联动时间窗" in vessel
     assert "清除联动" in vessel

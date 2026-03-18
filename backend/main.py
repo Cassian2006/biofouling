@@ -11,6 +11,7 @@ from backend.schemas.demo import (
     RegionalStatsResponse,
     ReportPreviewResponse,
     RiskCellRecord,
+    ScienceMaterialsResponse,
     VesselAnomalyDetailResponse,
     VesselAnomalyResponse,
     VesselDetailResponse,
@@ -34,6 +35,7 @@ from backend.services.demo_data import (
 )
 from backend.services.anomaly_data import get_demo_anomaly_summary, get_vessel_anomaly_detail
 from backend.services.forecast_data import get_vessel_forecast
+from backend.services.science_materials import get_science_materials
 from backend.services.scoring import estimate_scores
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -172,6 +174,11 @@ def demo_vessel_report_preview(mmsi: str) -> ReportPreviewResponse:
         return get_vessel_report_preview(mmsi)
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.get("/api/demo/science/materials", tags=["demo"], response_model=ScienceMaterialsResponse)
+def demo_science_materials() -> ScienceMaterialsResponse:
+    return get_science_materials()
 
 
 if FRONTEND_ASSETS_DIR.exists():

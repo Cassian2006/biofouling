@@ -4,6 +4,7 @@ const summary = ref(null);
 const vessels = ref([]);
 const riskCells = ref([]);
 const anomalySummary = ref(null);
+const scienceMaterials = ref(null);
 const loading = ref(false);
 const error = ref("");
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
@@ -360,6 +361,59 @@ async function fetchVesselAnomaly(mmsi) {
   }
 }
 
+function buildScienceMaterialsFallback() {
+  return {
+    title: "科学性说明",
+    intro:
+      "当前平台输出的是可解释的风险代理指标。最新科学升级已将环境因子改写为机制层，并补充敏感性分析与分量消融分析。",
+    sections: [
+      {
+        title: "评分边界",
+        paragraphs: [
+          "FPI 采用行为主导、环境修正、维护轻修正。",
+          "ECP 只表达相对代价惩罚，不是正式碳核算。",
+          "RRI 是区域综合风险图层，不等于真实污损地图。",
+        ],
+      },
+      {
+        title: "深度模块边界",
+        paragraphs: [
+          "LSTM 负责短期趋势预测，不负责长期生态演化判断。",
+          "异常检测负责筛查偏离常规模式的对象，不直接证明真实污损已发生。",
+        ],
+      },
+    ],
+    validation_summary: {
+      baseline_label: "当前科学评分",
+      baseline_recommendation_counts: {
+        "Prioritize cleaning assessment": 187,
+        "Monitor exposure trend": 207,
+        "Low immediate concern": 243,
+      },
+      sensitivity_scenarios: 6,
+      ablation_scenarios: 4,
+      most_stable_sensitivity: "温度权重上调",
+      most_disruptive_ablation: "去除温度分量",
+      highest_recommendation_change_sensitivity: "环境修正放宽",
+    },
+    maintenance_note:
+      "维护项当前采用“校准默认值 + 外部覆盖”的方式；若没有真实维护记录，系统会在单船页明确标注来源。",
+  };
+}
+
+async function fetchScienceMaterials() {
+  await fetchDemoData();
+  try {
+    const payload = await fetchJson(buildApiUrl("/api/demo/science/materials"));
+    scienceMaterials.value = payload;
+    return payload;
+  } catch (errorObject) {
+    const fallback = buildScienceMaterialsFallback();
+    scienceMaterials.value = fallback;
+    return fallback;
+  }
+}
+
 export function useDemoData() {
   const hasData = computed(() => Boolean(summary.value));
 
@@ -368,6 +422,7 @@ export function useDemoData() {
     vessels,
     riskCells,
     anomalySummary,
+    scienceMaterials,
     loading,
     error,
     hasData,
@@ -381,5 +436,6 @@ export function useDemoData() {
     fetchOverviewReportPreview,
     fetchAnomalySummary,
     fetchVesselAnomaly,
+    fetchScienceMaterials,
   };
 }

@@ -78,6 +78,9 @@ def test_vessel_detail_track_and_trend_endpoints_return_real_payloads() -> None:
     assert detail_payload["validation_summary"]["event_count"] == 0
     assert detail_payload["nearest_reference"] is not None
     assert detail_payload["nearest_reference_distance_km"] is not None
+    assert detail_payload["maintenance_info"]["gap_days_used"] == 90.0
+    assert detail_payload["maintenance_info"]["gap_source"] == "calibrated_default"
+    assert detail_payload["maintenance_info"]["maintenance_multiplier"] is not None
 
     track_payload = track_response.json()
     assert track_response.status_code == 200
@@ -191,6 +194,20 @@ def test_regional_endpoints_return_expected_distribution() -> None:
     assert len(anomaly_payload["anomaly_type_spatial_slices"][0]["top_hotspots"]) >= 1
     assert anomaly_payload["anomaly_type_spatial_slices"][0]["top_hotspots"][0]["grid_key"]
     assert all(item["anomaly_level"] != "observation_insufficient" for item in anomaly_payload["top_anomalies"])
+
+
+def test_science_materials_endpoint_returns_validation_and_statement() -> None:
+    response = client.get("/api/demo/science/materials")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["title"] == "科学性说明"
+    assert "FPI" in payload["intro"]
+    assert len(payload["sections"]) >= 4
+    assert payload["validation_summary"]["sensitivity_scenarios"] == 6
+    assert payload["validation_summary"]["ablation_scenarios"] == 4
+    assert payload["validation_summary"]["most_stable_sensitivity"] == "温度权重上调"
+    assert "维护项当前" in payload["maintenance_note"]
 
 
 def test_unknown_api_route_returns_404() -> None:

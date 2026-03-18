@@ -122,6 +122,7 @@ class VesselDetailResponse(BaseModel):
     validation_summary: ValidationSummary
     nearest_reference: ReferenceSiteRecord | None
     nearest_reference_distance_km: float | None
+    maintenance_info: "MaintenanceInfo"
 
 
 class VesselTrackPoint(BaseModel):
@@ -310,3 +311,34 @@ class ReportPreviewResponse(BaseModel):
     title: str
     markdown: str
     lines: list[str]
+
+
+class MaintenanceInfo(BaseModel):
+    gap_days_used: float | None
+    gap_source: str | None
+    maintenance_score: float | None
+    maintenance_multiplier: float | None
+    note: str
+
+
+class ScienceValidationSummaryResponse(BaseModel):
+    baseline_label: str
+    baseline_recommendation_counts: dict[str, int]
+    sensitivity_scenarios: int
+    ablation_scenarios: int
+    most_stable_sensitivity: str | None
+    most_disruptive_ablation: str | None
+    highest_recommendation_change_sensitivity: str | None
+
+
+class ScienceStatementSection(BaseModel):
+    title: str
+    paragraphs: list[str]
+
+
+class ScienceMaterialsResponse(BaseModel):
+    title: str
+    intro: str
+    sections: list[ScienceStatementSection]
+    validation_summary: ScienceValidationSummaryResponse
+    maintenance_note: str

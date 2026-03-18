@@ -39,6 +39,7 @@ const selectedVessel = computed(() => vesselDetail.value?.vessel || null);
 const staticProfile = computed(() => vesselDetail.value?.static_profile || null);
 const validationSummary = computed(() => vesselDetail.value?.validation_summary || null);
 const nearestReference = computed(() => vesselDetail.value?.nearest_reference || null);
+const maintenanceInfo = computed(() => vesselDetail.value?.maintenance_info || null);
 const forecastSignals = computed(() => vesselForecast.value?.signals || []);
 const forecastHistoryPoints = computed(() => vesselForecast.value?.history_points || []);
 const forecastAvailable = computed(() => Boolean(vesselForecast.value?.available));
@@ -205,6 +206,38 @@ const validationFacts = computed(() => {
   ];
 });
 
+const maintenanceFacts = computed(() => {
+  if (!maintenanceInfo.value) return [];
+  return [
+    {
+      title: "维护间隔口径",
+      value:
+        maintenanceInfo.value.gap_days_used !== null && maintenanceInfo.value.gap_days_used !== undefined
+          ? `${maintenanceInfo.value.gap_days_used} 天`
+          : "暂无",
+      description: maintenanceInfo.value.note,
+    },
+    {
+      title: "维护来源",
+      value:
+        maintenanceInfo.value.gap_source === "override"
+          ? "外部覆盖"
+          : maintenanceInfo.value.gap_source === "calibrated_default"
+            ? "校准默认值"
+            : "暂无",
+      description: "用于区分当前对象是否已有单独维护记录，还是仍使用统一默认维护间隔。",
+    },
+    {
+      title: "维护修正系数",
+      value:
+        maintenanceInfo.value.maintenance_multiplier !== null && maintenanceInfo.value.maintenance_multiplier !== undefined
+          ? maintenanceInfo.value.maintenance_multiplier
+          : "暂无",
+      description: "该系数以轻度修正方式进入 FPI，不替代行为暴露本身。",
+    },
+  ];
+});
+
 const vesselHeroHighlights = computed(() => {
   if (!selectedVessel.value) return [];
   return [
@@ -223,6 +256,15 @@ const vesselHeroHighlights = computed(() => {
     {
       title: "最近参考点",
       description: nearestReference.value?.name || "暂无匹配",
+    },
+    {
+      title: "维护口径",
+      description:
+        maintenanceInfo.value?.gap_source === "override"
+          ? "已接入单独维护记录"
+          : maintenanceInfo.value
+            ? "当前仍使用校准默认维护间隔"
+            : "待判定",
     },
   ];
 });
@@ -1061,6 +1103,25 @@ watch(
           <div class="module-head">
             <h4>{{ item.title }}</h4>
             <span v-if="item.assessment" class="status-pill">{{ item.assessment }}</span>
+          </div>
+          <p class="feature-highlight small">{{ item.value }}</p>
+          <p>{{ item.description }}</p>
+        </article>
+      </div>
+    </section>
+
+    <section v-if="maintenanceFacts.length" class="content-section">
+      <div class="section-head">
+        <p class="section-kicker">Maintenance</p>
+        <h3>
+          维护项说明
+          <HintTooltip text="维护项当前作为 FPI 的轻修正，不会主导评分；若没有真实维护记录，系统会使用校准默认值并明确标注来源。" />
+        </h3>
+      </div>
+      <div class="card-grid">
+        <article v-for="item in maintenanceFacts" :key="item.title" class="page-card module-card">
+          <div class="module-head">
+            <h4>{{ item.title }}</h4>
           </div>
           <p class="feature-highlight small">{{ item.value }}</p>
           <p>{{ item.description }}</p>

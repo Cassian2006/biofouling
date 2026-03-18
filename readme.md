@@ -2132,3 +2132,41 @@ Interpretation:
 
 Validation status:
 - `pytest = 53 passed`
+69. Science upgrade surfaced in frontend (2026-03-18)
+This round connects the recent science-focused upgrades to the product UI instead of leaving them only in docs and offline outputs.
+
+What changed:
+- Added science materials service:
+  - `backend/services/science_materials.py`
+- Added new demo API:
+  - `/api/demo/science/materials`
+- Vessel detail now returns explicit maintenance metadata:
+  - `gap_days_used`
+  - `gap_source`
+  - `maintenance_score`
+  - `maintenance_multiplier`
+- Dashboard now shows a compact science-validation summary.
+- The method drawer now reads science statement sections and validation summary from backend data instead of only relying on hardcoded frontend copy.
+- Vessel detail now includes a dedicated maintenance section explaining whether the current object uses:
+  - an external override
+  - or the calibrated default maintenance interval
+
+What users can now see in the UI:
+- On Dashboard:
+  - current scientific baseline recommendation split
+  - sensitivity scenario count
+  - ablation scenario count
+  - most stable sensitivity direction
+  - most disruptive ablation direction
+- In the method drawer:
+  - scientific statement sections
+  - latest validation summary
+  - explicit maintenance-item boundary note
+- On vessel detail:
+  - maintenance interval basis
+  - maintenance source
+  - maintenance multiplier
+
+Validation status:
+- `pytest = 53 passed`
+- `frontend npm run build` passed

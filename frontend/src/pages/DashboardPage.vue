@@ -15,11 +15,13 @@ const {
   fetchRegionalStats,
   fetchOverviewReportPreview,
   fetchAnomalySummary,
+  fetchScienceMaterials,
 } = useDemoData();
 
 const regionalStats = ref(null);
 const overviewReport = ref(null);
 const anomalySummary = ref(null);
+const scienceMaterials = ref(null);
 const activeLayer = ref("rri_score");
 const selectedHotspotKey = ref("");
 const activeAnomalyType = ref("all");
@@ -45,6 +47,7 @@ const anomalyCounts = computed(() => anomalySummary.value?.anomaly_level_counts 
 const anomalyTypeCounts = computed(() => anomalySummary.value?.anomaly_type_counts || {});
 const anomalyTypeProfiles = computed(() => anomalySummary.value?.anomaly_type_profiles || []);
 const anomalyTypeSpatialSlices = computed(() => anomalySummary.value?.anomaly_type_spatial_slices || []);
+const scienceValidation = computed(() => scienceMaterials.value?.validation_summary || null);
 const topAnomalies = computed(() => anomalySummary.value?.top_anomalies || []);
 const filteredAnomalies = computed(() => {
   if (activeAnomalyType.value === "all") return topAnomalies.value;
@@ -164,6 +167,7 @@ onMounted(async () => {
     regionalStats.value = await fetchRegionalStats();
     overviewReport.value = await fetchOverviewReportPreview();
     anomalySummary.value = await fetchAnomalySummary();
+    scienceMaterials.value = await fetchScienceMaterials();
     if (sortedCells.value.length) {
       selectedHotspotKey.value = `${sortedCells.value[0].grid_lat}-${sortedCells.value[0].grid_lon}`;
     }
@@ -238,6 +242,50 @@ onMounted(async () => {
         <span class="stat-label">高度异常船舶</span>
         <strong class="stat-value">{{ anomalyCounts.highly_abnormal || 0 }}</strong>
       </article>
+    </section>
+
+    <section v-if="scienceValidation" class="content-section">
+      <div class="section-head">
+        <p class="section-kicker">Science Validation</p>
+        <h3>
+          科学验证摘要
+          <HintTooltip text="这里展示的是当前 science-v2 评分在 15 天冻结窗口上的稳定性检查结果，用于说明这套评分并非对小幅调权非常脆弱。" />
+        </h3>
+      </div>
+      <div class="card-grid">
+        <article class="page-card module-card">
+          <div class="module-head">
+            <h4>当前科学评分分布</h4>
+          </div>
+          <p class="feature-highlight small">
+            {{ scienceValidation.baseline_recommendation_counts["Prioritize cleaning assessment"] || 0 }} /
+            {{ scienceValidation.baseline_recommendation_counts["Monitor exposure trend"] || 0 }} /
+            {{ scienceValidation.baseline_recommendation_counts["Low immediate concern"] || 0 }}
+          </p>
+          <p>对应“优先评估 / 持续监测 / 低即时关注”的当前样本分布。</p>
+        </article>
+        <article class="page-card module-card">
+          <div class="module-head">
+            <h4>敏感性分析</h4>
+          </div>
+          <p class="feature-highlight small">{{ scienceValidation.sensitivity_scenarios }} 组</p>
+          <p>最稳定场景：{{ scienceValidation.most_stable_sensitivity || "暂无" }}</p>
+        </article>
+        <article class="page-card module-card">
+          <div class="module-head">
+            <h4>分量消融</h4>
+          </div>
+          <p class="feature-highlight small">{{ scienceValidation.ablation_scenarios }} 组</p>
+          <p>最敏感分量：{{ scienceValidation.most_disruptive_ablation || "暂无" }}</p>
+        </article>
+        <article class="page-card module-card">
+          <div class="module-head">
+            <h4>建议变化率最高场景</h4>
+          </div>
+          <p class="feature-highlight small">{{ scienceValidation.highest_recommendation_change_sensitivity || "暂无" }}</p>
+          <p>表示当前最容易让阈值附近对象发生翻转的敏感性方向。</p>
+        </article>
+      </div>
     </section>
 
     <section class="content-section">

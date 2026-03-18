@@ -7,6 +7,7 @@ import pandas as pd
 
 from backend.schemas.demo import (
     DemoSummaryResponse,
+    MaintenanceInfo,
     ReferenceSiteRecord,
     RegionalStatsResponse,
     ReportPreviewResponse,
@@ -22,6 +23,7 @@ from backend.schemas.demo import (
     VesselTrackPoint,
     VesselTrackResponse,
 )
+from backend.services.scoring import default_maintenance_gap_days
 from scripts.build_vessel_catalog import build_ais_derived_catalog, load_static_profiles, merge_static_profiles
 from scripts.summarize_validation_events import load_validation_events, summarize_validation_events
 
@@ -501,6 +503,7 @@ def _load_demo_payload_by_signature(signature: tuple[str, ...]) -> dict[str, obj
         "window_label": window_label,
         "vessels": vessels,
         "risk_cells": risk_cells,
+        "features_frame": features,
         "reference_sites": reference_sites,
         "report_text": report_text,
         "ais": ais,
@@ -543,6 +546,38 @@ def _find_vessel(mmsi: str) -> VesselRecord:
     raise LookupError(f"Vessel {mmsi} not found")
 
 
+def _find_feature_row(mmsi: str) -> pd.Series:
+    features = load_demo_payload()["features_frame"]  # type: ignore[assignment]
+    row = features.loc[features["mmsi"].astype(str) == str(mmsi)]
+    if row.empty:
+        raise LookupError(f"Feature row for vessel {mmsi} not found")
+    return row.iloc[0]
+
+
+def _build_maintenance_info(row: pd.Series) -> MaintenanceInfo:
+    gap_source = row.get("maintenance_gap_source")
+    normalized_source = str(gap_source) if pd.notna(gap_source) else None
+    gap_days_used = _maybe_round(row.get("maintenance_gap_days_used"), 1)
+    if gap_days_used is None:
+        gap_days_used = round(default_maintenance_gap_days(), 1)
+        normalized_source = normalized_source or "calibrated_default"
+    if normalized_source == "override":
+        note = "当前维护项来自外部覆盖值，说明该对象已有单独维护间隔记录。"
+    else:
+        note = (
+            "当前维护项来自校准默认值，表示该对象尚未接入真实维护记录，"
+            "因此只作为轻度工程修正，不应被解释为真实保养历史。"
+        )
+    return MaintenanceInfo(
+        gap_days_used=gap_days_used,
+        gap_source=normalized_source,
+        maintenance_score=_maybe_round(row.get("maintenance_score")) or _maybe_round(gap_days_used / 180.0),
+        maintenance_multiplier=_maybe_round(row.get("maintenance_multiplier"))
+        or round(0.9 + 0.2 * min(gap_days_used / 180.0, 1.0), 3),
+        note=note,
+    )
+
+
 def get_demo_summary() -> DemoSummaryResponse:
     return load_demo_payload()["summary"]  # type: ignore[return-value]
 
@@ -558,6 +593,7 @@ def get_demo_risk_cells() -> list[RiskCellRecord]:
 def get_vessel_detail(mmsi: str) -> VesselDetailResponse:
     vessels = get_demo_vessels()
     vessel = _find_vessel(mmsi)
+    feature_row = _find_feature_row(mmsi)
     peer_vessels = [item for item in vessels if item.mmsi != mmsi][:8]
     reference_sites = load_demo_payload()["reference_sites"]  # type: ignore[assignment]
     nearest_reference, nearest_distance = (
@@ -575,6 +611,7 @@ def get_vessel_detail(mmsi: str) -> VesselDetailResponse:
         validation_summary=_find_validation_summary(mmsi),
         nearest_reference=nearest_reference,
         nearest_reference_distance_km=nearest_distance,
+        maintenance_info=_build_maintenance_info(feature_row),
     )
 
 

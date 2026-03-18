@@ -2382,3 +2382,36 @@ README 同步：
   - 去掉叶绿素分量后的 `mean_fpi_shift = +0.0097`
 - 本轮已完成回归验证：
   - `pytest = 53 passed`
+### 2026-03-18 08:00:00 +08:00
+操作：
+- 将最近完成的科学升级与验证结果正式接入前端。
+- 在单船页补充维护项口径与来源说明。
+- 新增后端科学材料接口，统一给前端提供科学说明与验证摘要。
+
+过程与思路：
+- 用户这次不是要求继续做离线学术材料，而是要把最近做完的升级真正放进产品里。最关键的不是再加一张图，而是让前端能直接看到：当前科学评分的验证结果、维护项从哪里来、以及这些边界如何解释。
+- 为了避免前端继续硬编码“科学口径”，本轮先在后端加了一层 `science_materials` 服务，把 `scientific_statement.md` 和 `outputs/science_validation/science_validation_summary.json` 汇总成统一 API。这样后面如果科学说明文档继续迭代，前端不用再手改多份文案。
+- 单船页这次重点收的是维护项。此前维护已经回到 FPI 里，但产品层并没有告诉用户它到底来自真实覆盖值，还是来自校准默认值。现在单船详情会明确展示维护间隔口径、来源和维护修正系数，并写清楚“默认值不等于真实保养历史”。
+- 总览页则补了一组紧凑的“科学验证摘要”卡片，让用户在不打开文档的情况下，也能看到当前 science-v2 做过敏感性分析和分量消融，不是只在 README 里写过。
+
+本轮结果：
+- 新增：
+  - `backend/services/science_materials.py`
+- 更新：
+  - `backend/main.py`
+  - `backend/schemas/demo.py`
+  - `backend/services/demo_data.py`
+  - `frontend/src/composables/useDemoData.js`
+  - `frontend/src/components/MethodDrawer.vue`
+  - `frontend/src/pages/DashboardPage.vue`
+  - `frontend/src/pages/VesselDetailPage.vue`
+  - `tests/test_api.py`
+  - `tests/test_frontend_copy.py`
+  - `readme.md`
+- 前端新增可见内容：
+  - Dashboard 的科学验证摘要
+  - MethodDrawer 的动态科学说明与维护边界
+  - Vessel detail 的维护项说明
+- 本轮已完成回归验证：
+  - `pytest = 53 passed`
+  - `frontend npm run build` 通过
